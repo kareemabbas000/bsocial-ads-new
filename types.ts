@@ -1,16 +1,16 @@
 
-export type DatePreset = 
-  | 'today' 
-  | 'yesterday' 
-  | 'last_3d' 
-  | 'last_7d' 
-  | 'last_14d' 
-  | 'last_30d' 
-  | 'last_90d' 
+export type DatePreset =
+  | 'today'
+  | 'yesterday'
+  | 'last_3d'
+  | 'last_7d'
+  | 'last_14d'
+  | 'last_30d'
+  | 'last_90d'
   | 'last_3months'
-  | 'this_month' 
-  | 'last_month' 
-  | 'this_year' 
+  | 'this_month'
+  | 'last_month'
+  | 'this_year'
   | 'last_year'
   | 'custom';
 
@@ -63,20 +63,20 @@ export interface InsightData {
   frequency?: string;
   inline_link_clicks?: string;
   inline_post_engagement?: string;
-  outbound_clicks?: Array<{action_type: string, value: string}>;
-  video_play_actions?: Array<{action_type: string, value: string}>;
-  
+  outbound_clicks?: Array<{ action_type: string, value: string }>;
+  video_play_actions?: Array<{ action_type: string, value: string }>;
+
   // New Metrics
   video_plays?: string; // 3-second video plays
   video_thruplays?: string;
   cost_per_result?: string; // CPR
   results?: string; // Generic results count
-  
-  actions?: Array<{action_type: string, value: string}>;
-  action_values?: Array<{action_type: string, value: string}>;
+
+  actions?: Array<{ action_type: string, value: string }>;
+  action_values?: Array<{ action_type: string, value: string }>;
   date_start: string;
   date_stop: string;
-  
+
   // Advanced Breakdowns
   age?: string;
   gender?: string;
@@ -85,11 +85,11 @@ export interface InsightData {
   device_platform?: string; // mobile, desktop
   hourly_stats_aggregated_by_audience_time_zone?: string; // "00:00:00 - 00:59:59"
   region?: string;
-  
+
   // Video Metrics
-  video_p25_watched_actions?: Array<{action_type: string, value: string}>;
-  video_p100_watched_actions?: Array<{action_type: string, value: string}>;
-  video_thruplay_watched_actions?: Array<{action_type: string, value: string}>;
+  video_p25_watched_actions?: Array<{ action_type: string, value: string }>;
+  video_p100_watched_actions?: Array<{ action_type: string, value: string }>;
+  video_thruplay_watched_actions?: Array<{ action_type: string, value: string }>;
 }
 
 export interface Targeting {
@@ -98,13 +98,13 @@ export interface Targeting {
   genders?: number[]; // 1=Male, 2=Female
   geo_locations?: {
     countries?: string[];
-    cities?: Array<{key: string; name: string; distance_unit: string; radius: number}>;
-    regions?: Array<{key: string; name: string; country: string}>;
+    cities?: Array<{ key: string; name: string; distance_unit: string; radius: number }>;
+    regions?: Array<{ key: string; name: string; country: string }>;
     location_types?: string[];
   };
-  interests?: Array<{id: string; name: string}>;
-  custom_audiences?: Array<{id: string; name: string}>;
-  excluded_custom_audiences?: Array<{id: string; name: string}>;
+  interests?: Array<{ id: string; name: string }>;
+  custom_audiences?: Array<{ id: string; name: string }>;
+  excluded_custom_audiences?: Array<{ id: string; name: string }>;
   publisher_platforms?: string[];
   facebook_positions?: string[];
   instagram_positions?: string[];
@@ -123,7 +123,7 @@ export interface Campaign {
   daily_budget?: string;
   lifetime_budget?: string;
   special_ad_categories?: string[];
-  insights?: InsightData; 
+  insights?: InsightData;
 }
 
 export interface AdSet {
@@ -148,16 +148,16 @@ export interface AdCreative {
   name: string;
   image_url?: string;
   thumbnail_url?: string;
-  image_hash?: string; 
+  image_hash?: string;
   title?: string;
   body?: string;
-  object_type?: string; 
+  object_type?: string;
   call_to_action_type?: string;
-  effective_object_story_id?: string; 
-  instagram_actor_id?: string; 
-  link_caption?: string; 
-  object_story_spec?: any; 
-  asset_feed_spec?: any; 
+  effective_object_story_id?: string;
+  instagram_actor_id?: string;
+  link_caption?: string;
+  object_story_spec?: any;
+  asset_feed_spec?: any;
 }
 
 export interface Ad {
@@ -235,6 +235,9 @@ export interface UserProfile {
   email: string;
   role: 'admin' | 'client';
   full_name: string;
+  first_name?: string;
+  last_name?: string;
+  company?: string;
 }
 
 export interface UserConfig {

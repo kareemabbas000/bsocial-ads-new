@@ -8,7 +8,7 @@ export const fetchUserProfile = async (userId: string): Promise<UserProfile | nu
     .select('*')
     .eq('id', userId)
     .single();
-  
+
   if (error) {
     console.error('Error fetching profile:', error);
     return null;
@@ -36,7 +36,7 @@ export const fetchSystemSetting = async (key: string): Promise<string | null> =>
     .select('value')
     .eq('key', key)
     .single();
-  
+
   if (error) return null;
   return data.value;
 };
@@ -83,6 +83,36 @@ export const updateUserConfig = async (userId: string, updates: Partial<UserConf
   const { error } = await supabase
     .from('user_config')
     .upsert({ user_id: userId, ...updates }, { onConflict: 'user_id' });
-    
+
   if (error) throw error;
+};
+
+export const createUser = async (userData: any) => {
+  const { data, error } = await supabase.functions.invoke('create-user', {
+    body: userData
+  });
+
+  if (error) throw error;
+  return data;
+};
+
+export const updateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
+  const { error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId);
+  if (error) throw error;
+};
+
+export const deleteUser = async (userId: string) => {
+  // Direct deletion using the service role key authenticated client
+  // this is more reliable than the edge function in this local dev setup
+  const { data, error } = await supabase.auth.admin.deleteUser(userId);
+
+  if (error) {
+    console.error("Supabase Admin Delete Error:", error);
+    throw error;
+  }
+
+  return data;
 };
