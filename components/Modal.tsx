@@ -75,38 +75,41 @@ interface NotificationProps {
     theme?: 'light' | 'dark';
 }
 
-export const NotificationBanner: React.FC<NotificationProps> = ({ type, message, onClose, theme = 'dark' }) => {
+export const NotificationBanner: React.FC<NotificationProps & { inline?: boolean }> = ({ type, message, onClose, theme = 'dark', inline = false }) => {
     const isDark = theme === 'dark';
 
     const styles = {
         success: {
-            bg: isDark ? 'bg-emerald-500/10' : 'bg-emerald-50',
-            border: isDark ? 'border-emerald-500/20' : 'border-emerald-200',
-            text: isDark ? 'text-emerald-400' : 'text-emerald-700',
-            icon: <CheckCircle size={18} className={isDark ? 'text-emerald-500' : 'text-emerald-600'} />
+            bg: isDark ? 'bg-emerald-500/20 shadow-emerald-900/20' : 'bg-emerald-50 shadow-emerald-100',
+            border: isDark ? 'border-emerald-500/30' : 'border-emerald-200',
+            text: isDark ? 'text-white' : 'text-emerald-900',
+            icon: <CheckCircle size={20} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
         },
         error: {
-            bg: isDark ? 'bg-red-500/10' : 'bg-red-50',
-            border: isDark ? 'border-red-500/20' : 'border-red-200',
-            text: isDark ? 'text-red-400' : 'text-red-700',
-            icon: <AlertTriangle size={18} className={isDark ? 'text-red-500' : 'text-red-600'} />
+            bg: isDark ? 'bg-red-500/20 shadow-red-900/20' : 'bg-red-50 shadow-red-100',
+            border: isDark ? 'border-red-500/30' : 'border-red-200',
+            text: isDark ? 'text-white' : 'text-red-900',
+            icon: <AlertTriangle size={20} className={isDark ? 'text-red-400' : 'text-red-600'} />
         },
         info: {
-            bg: isDark ? 'bg-blue-500/10' : 'bg-blue-50',
-            border: isDark ? 'border-blue-500/20' : 'border-blue-200',
-            text: isDark ? 'text-blue-400' : 'text-blue-700',
-            icon: <Info size={18} className={isDark ? 'text-blue-500' : 'text-blue-600'} />
+            bg: isDark ? 'bg-blue-500/20 shadow-blue-900/20' : 'bg-blue-50 shadow-blue-100',
+            border: isDark ? 'border-blue-500/30' : 'border-blue-200',
+            text: isDark ? 'text-white' : 'text-blue-900',
+            icon: <Info size={20} className={isDark ? 'text-blue-400' : 'text-blue-600'} />
         }
     };
 
     const style = styles[type];
+    const positionClasses = inline
+        ? 'relative w-full mb-4'
+        : 'fixed bottom-6 right-6 z-[60] max-w-sm w-full';
 
     return (
-        <div className={`fixed top-6 right-6 z-[60] max-w-sm w-full p-4 rounded-xl border shadow-xl flex items-start gap-3 animate-slide-in-right ${style.bg} ${style.border}`}>
-            <div className="shrink-0 mt-0.5">{style.icon}</div>
-            <p className={`text-sm font-medium flex-1 ${style.text}`}>{message}</p>
+        <div className={`${positionClasses} p-4 rounded-xl border shadow-lg backdrop-blur-md flex items-start gap-3 animate-slide-in-right ${style.bg} ${style.border}`}>
+            <div className="shrink-0 mt-0.5 animate-pulse-slow">{style.icon}</div>
+            <p className={`text-sm font-medium flex-1 leading-relaxed ${style.text}`}>{message}</p>
             {onClose && (
-                <button onClick={onClose} className={`shrink-0 opacity-60 hover:opacity-100 ${style.text}`}>
+                <button onClick={onClose} className={`shrink-0 opacity-60 hover:opacity-100 transition-opacity ${style.text}`}>
                     <X size={16} />
                 </button>
             )}

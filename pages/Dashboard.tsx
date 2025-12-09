@@ -153,6 +153,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     // Apply Permissions
     const multiplier = userConfig?.spend_multiplier || 1.0;
     const hideTotalSpend = userConfig?.hide_total_spend || false;
+    const disableAi = userConfig?.disable_ai || false;
     // Fallback to all if none specified, or if userRole is admin (passed config might be undefined for admin sometimes but usually we rely on userConfig)
     const allowedProfiles = userConfig?.allowed_profiles && userConfig.allowed_profiles.length > 0
         ? userConfig.allowed_profiles
@@ -350,7 +351,38 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
         return () => clearInterval(intervalId);
     }, [token, accountIds, datePreset, filter, refreshInterval]);
 
-    const activeConfig = PROFILE_CONFIG[profile];
+    const activeConfig = useMemo(() => {
+        const base = PROFILE_CONFIG[profile];
+        if (!hideTotalSpend) return base;
+
+        const hidden = ['spend', 'cpc', 'cpa', 'cpm', 'cost_per_result', 'roas'];
+
+        // Filter cards
+        const newCards = base.cards.filter(c => !hidden.includes(c.id));
+
+        // Adjust Main Chart if it uses hidden metrics
+        let newMainChart = { ...base.mainChart };
+        if (hidden.includes(newMainChart.bar.key) || hidden.includes(newMainChart.line.key)) {
+            newMainChart = {
+                bar: { key: 'reach', color: '#0055ff', name: 'Reach', axisLabel: 'REACH' },
+                line: { key: 'impressions', color: '#8b5cf6', name: 'Impressions', axisLabel: 'IMPRESSIONS' },
+                title: 'Reach vs. Impressions'
+            };
+        }
+
+        // Adjust Breakdown Metric if hidden
+        let newBreakdown = base.breakdownMetric;
+        if (hidden.includes(newBreakdown)) {
+            newBreakdown = 'impressions';
+        }
+
+        return {
+            ...base,
+            cards: newCards,
+            mainChart: newMainChart,
+            breakdownMetric: newBreakdown
+        };
+    }, [profile, hideTotalSpend]);
 
     const processedFunnelData = useMemo(() => {
         if (!accountData) return [];
@@ -437,10 +469,18 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                 let volumeLabel = '';
 
                 if (profile === 'sales') {
-                    volume = spend;
-                    volumeLabel = 'Spend';
-                    efficiency = roas;
-                    efficiencyLabel = 'ROAS';
+                    if (userConfig?.hide_total_spend) {
+                        // FALLBACK: Use Engagement Metrics if Finance is Hidden
+                        volume = impr;
+                        volumeLabel = 'Impressions';
+                        efficiency = postEng;
+                        efficiencyLabel = 'Engagements';
+                    } else {
+                        volume = spend;
+                        volumeLabel = 'Spend';
+                        efficiency = roas;
+                        efficiencyLabel = 'ROAS';
+                    }
                 } else if (profile === 'leads') {
                     volume = impr;
                     volumeLabel = 'Impressions';
@@ -555,7 +595,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     }
 
     if (loading) {
-        return <LoadingSpinner theme={theme} message="Loading Dashboard" />;
+        return <LoadingSpinner theme={theme} message="Loading Dashboard" bgClass="bg-transparent" />;
     }
 
     const parseBold = (text: string, isDark: boolean) => {
@@ -649,23 +689,25 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                     )}
                 </div>
 
-                <div className={`flex-1 w-full md:w-auto border rounded-xl px-4 py-2 flex items-center justify-between backdrop-blur-md ${isDark ? 'bg-blue-900/10 border-blue-800/30' : 'bg-blue-50 border-blue-100'}`}>
-                    <div className="flex items-center space-x-3">
-                        <div className={`p-1.5 rounded-full animate-pulse ${isDark ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
-                            <Sparkles size={14} className="text-blue-500" />
+                {!disableAi && (
+                    <div className={`flex-1 w-full md:w-auto border rounded-xl px-4 py-2 flex items-center justify-between backdrop-blur-md ${isDark ? 'bg-blue-900/10 border-blue-800/30' : 'bg-blue-50 border-blue-100'}`}>
+                        <div className="flex items-center space-x-3">
+                            <div className={`p-1.5 rounded-full animate-pulse ${isDark ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
+                                <Sparkles size={14} className="text-blue-500" />
+                            </div>
+                            <span className={`text-sm font-medium ${isDark ? 'text-blue-200' : 'text-blue-700'}`}>AI has new optimization insights.</span>
                         </div>
-                        <span className={`text-sm font-medium ${isDark ? 'text-blue-200' : 'text-blue-700'}`}>AI has new optimization insights.</span>
+                        <button onClick={handleRunAI} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg shadow-blue-500/20">
+                            View Audit
+                        </button>
                     </div>
-                    <button onClick={handleRunAI} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg shadow-blue-500/20">
-                        View Audit
-                    </button>
-                </div>
+                )}
             </div>
 
             {/* Primary KPI Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className={`grid grid-cols-1 md:grid-cols-2 ${hideTotalSpend ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
                 {activeConfig.cards.map((card: any) => {
-                    if (card.id === 'spend' && hideTotalSpend) return null;
+                    // Filtered by activeConfig, no need for manual check
 
                     const dataKey = card.id;
                     let value = 0;
@@ -732,7 +774,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column: Charts */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className={`${disableAi ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-6`}>
 
                     {activeTab === 'overview' && (
                         <>
@@ -886,7 +928,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                             const convRate = nextStep && step.value > 0 ? ((nextStep.value / step.value) * 100).toFixed(1) + '%' : null;
 
                                             return (
-                                                <div key={idx} className="flex-1 flex flex-col items-center relative group">
+                                                <div key={idx} className="flex-1 flex flex-col items-center relative group min-w-0">
                                                     <div className="flex items-center w-full">
                                                         {/* Card */}
                                                         <div className={`
@@ -896,17 +938,17 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                                     ${!isLast ? 'md:border-r border-dashed' : ''}
                                                     ${isDark
                                                                 ? 'bg-gradient-to-b from-slate-800 to-slate-900/50 border-slate-700/50 hover:bg-slate-800'
-                                                                : 'bg-white hover:bg-slate-50 border-slate-100'}
+                                                                : 'bg-slate-50/80 hover:bg-white border-slate-200 shadow-sm'}
                                                     border md:border-y md:border-l ${isLast ? 'md:border-r' : ''}
                                                     rounded-xl md:rounded-none
                                                 `}>
                                                             <div className="flex flex-col h-full justify-between items-center text-center">
-                                                                <div className="mb-4 p-3 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:scale-110 transition-transform duration-300">
+                                                                <div className={`mb-4 p-3 rounded-full group-hover:scale-110 transition-transform duration-300 ${isDark ? 'bg-slate-800' : 'bg-white shadow-sm border border-slate-100'}`}>
                                                                     <div className="w-3 h-3 rounded-full shadow-inner" style={{ backgroundColor: step.fill, boxShadow: `0 0 10px ${step.fill}` }}></div>
                                                                 </div>
 
                                                                 <div>
-                                                                    <div className={`text-xs uppercase font-extrabold tracking-widest mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                                    <div className={`text-xs uppercase font-extrabold tracking-widest mb-2 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
                                                                         {step.name}
                                                                     </div>
                                                                     <div className={`text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-br ${isDark ? 'from-white to-slate-400' : 'from-slate-900 to-slate-600'}`}>
@@ -1310,54 +1352,57 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                 {/* Dynamic Summary below the heatmap */}
                                 {getHeatmapSummary()}
                             </div>
+                            {/* AI Analysis Widget within Time Tab if needed, or hide if desired. For now, assuming only bottom widget matters. */}
                         </div>
                     )}
 
                 </div>
 
                 {/* Right Column: AI Analysis Panel */}
-                <div className="lg:col-span-1">
-                    <div className={`sticky top-6 border rounded-xl p-0 h-[calc(100vh-12rem)] flex flex-col shadow-2xl overflow-hidden ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xl'}`}>
-                        <div className={`p-4 border-b flex items-center justify-between ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                            <div className="flex items-center space-x-2">
-                                <Zap size={18} className="text-yellow-400" />
-                                <h3 className={`font-bold ${styles.heading}`}>AI Audit</h3>
+                {!disableAi && (
+                    <div className="lg:col-span-1">
+                        <div className={`sticky top-6 border rounded-xl p-0 h-[calc(100vh-12rem)] flex flex-col shadow-2xl overflow-hidden ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xl'}`}>
+                            <div className={`p-4 border-b flex items-center justify-between ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                <div className="flex items-center space-x-2">
+                                    <Zap size={18} className="text-yellow-400" />
+                                    <h3 className={`font-bold ${styles.heading}`}>AI Audit</h3>
+                                </div>
+                                {analyzing && <div className="text-xs text-slate-400 animate-pulse">Thinking...</div>}
                             </div>
-                            {analyzing && <div className="text-xs text-slate-400 animate-pulse">Thinking...</div>}
-                        </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                            {!aiAnalysis && !analyzing ? (
-                                <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-50">
-                                    <Zap size={48} className="text-slate-400" />
-                                    <p className="text-slate-400 text-sm px-8">Run an audit to see a comprehensive breakdown of your account health, wasted spend, and scaling wins.</p>
-                                    <button onClick={handleRunAI} className="px-4 py-2 bg-slate-800 rounded text-slate-300 text-sm hover:text-white">Start Audit</button>
-                                </div>
-                            ) : (
-                                <div className="prose prose-sm max-w-none">
-                                    {aiAnalysis && <RichTextRenderer content={aiAnalysis} />}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className={`p-4 border-t ${isDark ? 'bg-slate-800/30 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                            <button
-                                onClick={handleRunAI}
-                                disabled={analyzing}
-                                className="w-full py-3 bg-gradient-to-r from-brand-600 to-blue-600 hover:from-brand-500 hover:to-blue-500 text-white font-bold rounded-lg shadow-lg transition-all flex justify-center items-center space-x-2"
-                            >
-                                {analyzing ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span>Auditing...</span>
-                                    </>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                                {!aiAnalysis && !analyzing ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-50">
+                                        <Zap size={48} className="text-slate-400" />
+                                        <p className="text-slate-400 text-sm px-8">Run an audit to see a comprehensive breakdown of your account health, wasted spend, and scaling wins.</p>
+                                        <button onClick={handleRunAI} className="px-4 py-2 bg-slate-800 rounded text-slate-300 text-sm hover:text-white">Start Audit</button>
+                                    </div>
                                 ) : (
-                                    <span>Generate Fresh Report</span>
+                                    <div className="prose prose-sm max-w-none">
+                                        {aiAnalysis && <RichTextRenderer content={aiAnalysis} />}
+                                    </div>
                                 )}
-                            </button>
+                            </div>
+
+                            <div className={`p-4 border-t ${isDark ? 'bg-slate-800/30 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                <button
+                                    onClick={handleRunAI}
+                                    disabled={analyzing}
+                                    className="w-full py-3 bg-gradient-to-r from-brand-600 to-blue-600 hover:from-brand-500 hover:to-blue-500 text-white font-bold rounded-lg shadow-lg transition-all flex justify-center items-center space-x-2"
+                                >
+                                    {analyzing ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <span>Auditing...</span>
+                                        </>
+                                    ) : (
+                                        <span>Generate Fresh Report</span>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
         </div >
     );

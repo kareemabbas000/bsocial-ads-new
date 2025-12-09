@@ -4,80 +4,80 @@ import { Campaign, AIAnalysisResult, AdPerformance } from "../types";
 
 // Helper to calculate blended metrics for context
 const calculateBlendedMetrics = (campaigns: Campaign[]) => {
-    let totalSpend = 0;
-    let totalPurchases = 0;
-    let totalRevenue = 0;
-    let totalClicks = 0;
-    let totalImpressions = 0;
+  let totalSpend = 0;
+  let totalPurchases = 0;
+  let totalRevenue = 0;
+  let totalClicks = 0;
+  let totalImpressions = 0;
 
-    campaigns.forEach(c => {
-        const insights = c.insights;
-        if (!insights) return;
-        
-        const spend = parseFloat(insights.spend || '0');
-        const clicks = parseInt(insights.clicks || '0');
-        const imps = parseInt(insights.impressions || '0');
-        
-        // Find Purchase Value & Count
-        const actionValues = insights.action_values || [];
-        let revObj = actionValues.find((v: any) => v.action_type === 'omni_purchase' || v.action_type === 'purchase' || v.action_type === 'offsite_conversion.fb_pixel_purchase');
-        if (!revObj) revObj = actionValues.find((v: any) => v.action_type.toLowerCase().includes('purchase') && !v.action_type.includes('cost'));
-        const revenue = revObj ? parseFloat(revObj.value) : 0;
+  campaigns.forEach(c => {
+    const insights = c.insights;
+    if (!insights) return;
 
-        const actions = insights.actions || [];
-        let purchObj = actions.find((a: any) => a.action_type === 'omni_purchase' || a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase');
-        if (!purchObj) purchObj = actions.find((a: any) => a.action_type.toLowerCase().includes('purchase'));
-        const purchases = purchObj ? parseInt(purchObj.value) : 0;
+    const spend = parseFloat(insights.spend || '0');
+    const clicks = parseInt(insights.clicks || '0');
+    const imps = parseInt(insights.impressions || '0');
 
-        totalSpend += spend;
-        totalRevenue += revenue;
-        totalPurchases += purchases;
-        totalClicks += clicks;
-        totalImpressions += imps;
-    });
+    // Find Purchase Value & Count
+    const actionValues = insights.action_values || [];
+    let revObj = actionValues.find((v: any) => v.action_type === 'omni_purchase' || v.action_type === 'purchase' || v.action_type === 'offsite_conversion.fb_pixel_purchase');
+    if (!revObj) revObj = actionValues.find((v: any) => v.action_type.toLowerCase().includes('purchase') && !v.action_type.includes('cost'));
+    const revenue = revObj ? parseFloat(revObj.value) : 0;
 
-    return {
-        spend: totalSpend,
-        roas: totalSpend > 0 ? totalRevenue / totalSpend : 0,
-        cpa: totalPurchases > 0 ? totalSpend / totalPurchases : 0,
-        ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
-        cpm: totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0
-    };
+    const actions = insights.actions || [];
+    let purchObj = actions.find((a: any) => a.action_type === 'omni_purchase' || a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase');
+    if (!purchObj) purchObj = actions.find((a: any) => a.action_type.toLowerCase().includes('purchase'));
+    const purchases = purchObj ? parseInt(purchObj.value) : 0;
+
+    totalSpend += spend;
+    totalRevenue += revenue;
+    totalPurchases += purchases;
+    totalClicks += clicks;
+    totalImpressions += imps;
+  });
+
+  return {
+    spend: totalSpend,
+    roas: totalSpend > 0 ? totalRevenue / totalSpend : 0,
+    cpa: totalPurchases > 0 ? totalSpend / totalPurchases : 0,
+    ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
+    cpm: totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0
+  };
 };
 
 export const analyzeCampaignPerformance = async (campaigns: Campaign[]): Promise<AIAnalysisResult> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
+
     // 1. Calculate Baselines
     const accountStats = calculateBlendedMetrics(campaigns);
-    
+
     // 2. Prepare Data Snapshot (Top 20 by spend to manage token limits)
     // We sort by spend to ensure we analyze where the money is going.
     const sortedCampaigns = [...campaigns].sort((a, b) => parseFloat(b.insights?.spend || '0') - parseFloat(a.insights?.spend || '0')).slice(0, 20);
 
     const campaignDataStr = sortedCampaigns.map(c => {
-       const i = c.insights;
-       if (!i) return null;
-       
-       const spend = parseFloat(i.spend || '0');
-       if (spend < 10) return null; // Skip insignificant data
+      const i = c.insights;
+      if (!i) return null;
 
-       // Calculate ROAS
-       const actionValues = i.action_values || [];
-       let revObj = actionValues.find((v: any) => v.action_type === 'omni_purchase' || v.action_type === 'purchase');
-       if (!revObj) revObj = actionValues.find((v: any) => v.action_type.toLowerCase().includes('purchase'));
-       const revenue = revObj ? parseFloat(revObj.value) : 0;
-       const roas = spend > 0 ? revenue / spend : 0;
+      const spend = parseFloat(i.spend || '0');
+      if (spend < 10) return null; // Skip insignificant data
 
-       // Calculate CPA
-       const actions = i.actions || [];
-       let purchObj = actions.find((a: any) => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
-       if (!purchObj) purchObj = actions.find((a: any) => a.action_type.toLowerCase().includes('purchase'));
-       const purchases = purchObj ? parseInt(purchObj.value) : 0;
-       const cpa = purchases > 0 ? spend / purchases : 0;
+      // Calculate ROAS
+      const actionValues = i.action_values || [];
+      let revObj = actionValues.find((v: any) => v.action_type === 'omni_purchase' || v.action_type === 'purchase');
+      if (!revObj) revObj = actionValues.find((v: any) => v.action_type.toLowerCase().includes('purchase'));
+      const revenue = revObj ? parseFloat(revObj.value) : 0;
+      const roas = spend > 0 ? revenue / spend : 0;
 
-       return `
+      // Calculate CPA
+      const actions = i.actions || [];
+      let purchObj = actions.find((a: any) => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
+      if (!purchObj) purchObj = actions.find((a: any) => a.action_type.toLowerCase().includes('purchase'));
+      const purchases = purchObj ? parseInt(purchObj.value) : 0;
+      const cpa = purchases > 0 ? spend / purchases : 0;
+
+      return `
        - Name: "${c.name}"
          Status: ${c.status}
          Spend: $${spend.toFixed(0)}
@@ -130,10 +130,10 @@ export const analyzeCampaignPerformance = async (campaigns: Campaign[]): Promise
     });
 
     const text = response.text || "Could not generate analysis.";
-    
+
     return {
       analysis: text,
-      recommendations: [], 
+      recommendations: [],
       sentiment: 'neutral'
     };
 
@@ -150,14 +150,14 @@ export const analyzeCampaignPerformance = async (campaigns: Campaign[]): Promise
 export const analyzeCreative = async (ad: AdPerformance): Promise<string> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
+
     const isPaused = ad.status === 'PAUSED' || ad.status === 'ARCHIVED';
-    const statusContext = isPaused 
-        ? "STATUS: PAUSED (Do not suggest pausing. Analyze why it failed or if it should be revived)." 
-        : "STATUS: ACTIVE (Recommend Stop, Scale, or Optimize).";
+    const statusContext = isPaused
+      ? "STATUS: PAUSED (Do not suggest pausing. Analyze why it failed or if it should be revived)."
+      : "STATUS: ACTIVE (Recommend Stop, Scale, or Optimize).";
 
     const prompt = `
-      As a Creative Strategist, audit this ad asset.
+      As a Senior Media Buyer & Creative Strategist, perform a "Deep Dive" audit on this ad asset.
       
       DATA:
       - Name: ${ad.ad_name}
@@ -167,15 +167,24 @@ export const analyzeCreative = async (ad: AdPerformance): Promise<string> => {
       - CPA: $${ad.cpa?.toFixed(2)}
       - CTR: ${ad.ctr}%
       - Thumb Stopping Rate (3s Play / Impr): ${ad.video_plays ? ((parseInt(ad.video_plays) / parseInt(ad.impressions)) * 100).toFixed(2) : 'N/A'}%
+      - Conversion Rate: ${ad.clicks && parseInt(ad.clicks) > 0 && ad.results ? ((parseFloat(ad.results) / parseInt(ad.clicks)) * 100).toFixed(2) : '0'}%
       
-      ANALYSIS REQUIRED:
-      1. **Hook Analysis**: Is the CTR healthy (>1%)? If not, critique the headline/thumbnail.
-      2. **Conversion**: Is the ROAS healthy? If CTR is high but ROAS low, mention "Offer Mismatch".
-      3. **Action**: 
-         - If Active: Stop, Scale, or Iterate?
-         - If Paused: Was this a premature pause (High ROAS) or justified (Low ROAS)?
-
-      Keep it to 3 bullet points.
+      ANALYSIS REQUIRED (Data-Driven from all angles):
+      
+      # 🧪 Hook & Hold Analysis
+      (Analyze CTR & Thumb Stop Rate. Is the creative capturing attention? If CTR < 1%, provide specific visual/hook recommendations.)
+      
+      # 💰 Financial Logic
+      (Analyze ROAS & CPA relative to spend. Is this profitable? Does the CPA justify the volume?)
+      
+      # 🎯 Conversion Harmony
+      (Compare CTR vs. Conversion Rate. High CTR + Low Conv Rate = Offer/Landing Page Mismatch. Low CTR + High Conv Rate = Boring Creative but Good Product. Diagnose this.)
+      
+      # ⚡ ACTIONABLE VERDICT
+      **[SELECT ONE: SCALE / PAUSE / ITERATE / REVIVE]**
+      (Provide a clear, direct instruction on what to do with this ad right now.)
+      
+      Tone: Professional, Insightful, and Ruthless. Use markdown formatting.
     `;
 
     const response = await ai.models.generateContent({
@@ -191,9 +200,9 @@ export const analyzeCreative = async (ad: AdPerformance): Promise<string> => {
 
 export const generateAdCopy = async (productDescription: string, objective: string) => {
   try {
-     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-     
-     const prompt = `
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    const prompt = `
       Generate "Direct Response" style Facebook Ad Copy.
       Product: ${productDescription}
       Objective: ${objective}
@@ -210,7 +219,7 @@ export const generateAdCopy = async (productDescription: string, objective: stri
       model: 'gemini-2.5-flash',
       contents: prompt,
     });
-    
+
     return response.text;
   } catch (error) {
     console.error("Copy Gen Failed", error);

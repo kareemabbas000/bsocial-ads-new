@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchAllUsers, updateUserRole, updateUserConfig, fetchSystemSetting, updateSystemSetting, createUser, updateUserProfile, deleteUser } from '../services/supabaseService';
 import { fetchAdAccounts, fetchCampaignsBatch } from '../services/metaService';
 import { UserProfile, UserConfig, Theme, AdAccount } from '../types';
-import { Users, Settings, Shield, Save, X, Edit, CheckSquare, Search, Key, Calendar, Layers, Lock, AlertTriangle, Clock, Plus, Trash2 } from 'lucide-react';
+import { Users, Settings, Shield, Save, X, Edit, CheckSquare, Search, Key, Calendar, Layers, Lock, AlertTriangle, Clock, Plus, Trash2, Layout } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Modal, NotificationBanner } from '../components/Modal';
 
@@ -192,6 +192,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
             global_campaign_filter: user.config?.global_campaign_filter || [],
             fixed_date_start: user.config?.fixed_date_start || '',
             fixed_date_end: user.config?.fixed_date_end || '',
+            disable_ai: user.config?.disable_ai || false,
+            disable_creative_tags: user.config?.disable_creative_tags || false,
+            hide_account_name: user.config?.hide_account_name || false,
             refresh_interval: user.config?.refresh_interval || 10
         });
     };
@@ -233,6 +236,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
                 global_campaign_filter: editForm.global_campaign_filter,
                 fixed_date_start: editForm.fixed_date_start || (null as any),
                 fixed_date_end: editForm.fixed_date_end || (null as any),
+                disable_ai: editForm.disable_ai,
+                disable_creative_tags: editForm.disable_creative_tags,
+                hide_account_name: editForm.hide_account_name,
                 refresh_interval: editForm.refresh_interval
             };
 
@@ -273,7 +279,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
 
     // ... (rest of helper functions) ...
 
-    if (loading) return <LoadingSpinner theme={theme} message="Loading Administration..." />;
+    if (loading) return <LoadingSpinner theme={theme} message="Loading Administration..." bgClass="bg-transparent" />;
 
     return (
         <div className="space-y-8 pb-12">
@@ -292,28 +298,28 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
                 </button>
             </div>
 
-            {/* System Settings */}
-            <div className={`p-6 rounded-xl border ${cardClass}`}>
-                <h3 className={`text-lg font-bold mb-4 flex items-center ${textClass}`}>
-                    <Settings size={20} className="mr-2 text-brand-500" />
-                    System Configuration
-                </h3>
-                <div className="flex gap-4 items-end">
-                    <div className="flex-1">
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Global Meta Access Token (System Wide)</label>
-                        <div className="relative">
-                            <Key size={16} className="absolute left-3 top-3 text-slate-500" />
+            {/* Compressed System Settings */}
+            <div className={`p-4 rounded-xl border ${cardClass}`}>
+                <div className="flex justify-between items-center mb-0">
+                    <h3 className={`text-base font-bold flex items-center ${textClass}`}>
+                        <Settings size={18} className="mr-2 text-brand-500" />
+                        System Configuration
+                    </h3>
+                    <div className="flex gap-2 items-center">
+                        <div className="relative w-96">
+                            <Key size={14} className="absolute left-2.5 top-2 text-slate-500" />
                             <input
                                 type="password"
                                 value={metaToken}
                                 onChange={(e) => setMetaToken(e.target.value)}
-                                className={`w-full pl-10 p-2.5 rounded-lg border text-sm ${inputClass}`}
+                                className={`w-full pl-8 py-1.5 rounded-lg border text-xs ${inputClass}`}
+                                placeholder="Global Meta Access Token"
                             />
                         </div>
+                        <button onClick={handleSaveToken} className="bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs flex items-center shadow-lg shadow-brand-500/20 active:scale-95 transition-all">
+                            <Save size={14} className="mr-1.5" /> Save Token
+                        </button>
                     </div>
-                    <button onClick={handleSaveToken} className="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2.5 rounded-lg font-bold text-sm flex items-center">
-                        <Save size={16} className="mr-2" /> Save Token
-                    </button>
                 </div>
             </div>
 
@@ -330,62 +336,69 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
                     <table className="w-full text-left text-sm border-collapse">
                         <thead className={`uppercase text-[11px] tracking-wider font-bold ${isDark ? 'bg-slate-900/50 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
                             <tr>
-                                <th className="p-4 border-b border-transparent">User / Client</th>
-                                <th className="p-4 border-b border-transparent">Role</th>
-                                <th className="p-4 border-b border-transparent">Assigned Accounts</th>
-                                <th className="p-4 border-b border-transparent">Profiles</th>
-                                <th className="p-4 border-b border-transparent">Spend Rules</th>
-                                <th className="p-4 border-b border-transparent text-right">Actions</th>
+                                <th className="px-4 py-2 border-b border-transparent">User / Client</th>
+                                <th className="px-4 py-2 border-b border-transparent">Role</th>
+                                <th className="px-4 py-2 border-b border-transparent">Assigned Accounts</th>
+                                <th className="px-4 py-2 border-b border-transparent">Profiles</th>
+                                <th className="px-4 py-2 border-b border-transparent">Money View</th>
+                                <th className="px-4 py-2 border-b border-transparent text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-100'}`}>
                             {users.map(user => (
                                 <tr key={user.id} className={`group transition-colors ${isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'}`}>
-                                    <td className="p-4 whitespace-nowrap">
-                                        <div className="flex flex-col">
+                                    <td className="px-4 py-2.5 whitespace-nowrap">
+                                        <div className="flex flex-col justify-center h-full">
                                             <div className={`font-bold text-sm ${textClass}`}>
                                                 {user.first_name ? `${user.first_name} ${user.last_name}` : user.email.split('@')[0]}
                                             </div>
-                                            <div className="text-xs text-slate-500 mt-0.5">{user.email}</div>
+                                            <div className="text-[10px] text-slate-500">{user.email}</div>
                                             {user.company && (
-                                                <div className={`text-[10px] uppercase font-bold tracking-wider mt-1 inline-block px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                                                <div className={`text-[9px] uppercase font-bold tracking-wider mt-0.5 inline-block px-1.5 py-0 rounded w-fit ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
                                                     {user.company}
                                                 </div>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="p-4 align-top pt-5">
-                                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'}`}>
+                                    <td className="px-4 py-2.5 align-middle">
+                                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'}`}>
                                             {user.role}
                                         </span>
                                     </td>
-                                    <td className="p-4 align-top pt-5">
-                                        <div className="flex flex-wrap gap-1.5">
+                                    <td className="px-4 py-2.5 align-middle">
+                                        <div className="flex flex-wrap gap-1">
                                             {user.config?.ad_account_ids?.length
-                                                ? user.config.ad_account_ids.map(id => <span key={id} className="text-[10px] font-mono bg-brand-500/10 text-brand-500 px-1.5 py-0.5 rounded border border-brand-500/20">{id}</span>)
-                                                : <span className="text-slate-500 italic text-xs">No accounts assigned</span>
-                                            }
+                                                ? user.config.ad_account_ids.map(id => {
+                                                    const account = availableAccounts.find(a => a.id === id);
+                                                    return (
+                                                        <span key={id} className="text-[9px] font-bold bg-brand-500/10 text-brand-500 px-1.5 py-0.5 rounded border border-brand-500/20 truncate max-w-[120px] inline-block shadow-[0_0_8px_rgba(99,102,241,0.1)]" title={id}>
+                                                            {account ? account.name : id}
+                                                        </span>
+                                                    );
+                                                })
+                                                : <span className="text-slate-400 italic text-[10px]">No accounts assigned</span>}
                                         </div>
                                     </td>
-                                    <td className="p-4 align-top pt-5">
-                                        <div className="text-xs text-slate-500 max-w-[150px] truncate">
+                                    <td className="px-4 py-2.5 align-middle">
+                                        <div className="text-[10px] text-slate-500 max-w-[150px] truncate leading-tight">
                                             {user.config?.allowed_profiles?.join(', ') || 'All'}
                                         </div>
                                     </td>
-                                    <td className="p-4 align-top pt-5">
-                                        <div className="text-xs flex flex-col gap-1">
-                                            {user.config?.hide_total_spend && <span className="text-red-400 font-medium">Hides Spend</span>}
+                                    <td className="px-4 py-2.5 align-middle">
+                                        <div className="text-[10px] flex flex-col leading-tight">
+                                            {user.config?.hide_total_spend && <span className="text-red-400 font-medium">Hides Financials</span>}
                                             {user.config?.spend_multiplier !== 1 && <span className="text-brand-400 font-bold">x{user.config?.spend_multiplier} Multiplier</span>}
-                                            {!user.config?.hide_total_spend && user.config?.spend_multiplier === 1 && <span className="text-slate-500 opacity-50">-</span>}
+                                            {!user.config?.hide_total_spend && (user.config?.spend_multiplier === undefined || user.config?.spend_multiplier === 1) && <span className="text-slate-500 opacity-50">-</span>}
                                         </div>
                                     </td>
-                                    <td className="p-4 text-right align-top pt-4">
+                                    <td className="px-4 py-2.5 text-right align-middle">
                                         <div className="flex justify-end gap-1">
-                                            <button onClick={() => openEdit(user)} className="p-2 hover:bg-brand-500/10 text-slate-400 hover:text-brand-500 rounded-lg transition-colors" title="Edit User">
-                                                <Edit size={16} />
+                                            <button onClick={() => openEdit(user)} className="p-1.5 hover:bg-brand-500/10 text-slate-400 hover:text-brand-500 rounded-lg transition-colors" title="Edit User">
+                                                <Edit size={14} />
                                             </button>
-                                            <button onClick={() => confirmDeleteUser({ id: user.id, email: user.email })} className="p-2 hover:bg-red-500/10 text-slate-400 hover:text-red-500 rounded-lg transition-colors" title="Delete User">
-                                                <Trash2 size={16} />
+                                            <button onClick={() => confirmDeleteUser({ id: user.id, email: user.email })} className="p-1.5 hover:bg-red-500/10 text-slate-400 hover:text-red-500 rounded-lg transition-colors" title="Delete User">
+                                                <Trash2 size={14} />
+
                                             </button>
                                         </div>
                                     </td>
@@ -396,370 +409,347 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
                 </div>
             </div>
 
-            {/* Edit Modal */}
+            {/* Super-Compressed Edit Modal */}
             {editingUser && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className={`w-full max-w-4xl rounded-xl border shadow-2xl overflow-hidden flex flex-col max-h-[95vh] ${cardClass}`}>
-                        <div className={`p-6 border-b flex justify-between items-center ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+                    <div className={`w-full max-w-3xl rounded-xl border shadow-2xl flex flex-col max-h-[85vh] ${cardClass}`}>
+                        {/* Header */}
+                        <div className={`px-4 py-3 border-b flex justify-between items-center ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
                             <div>
-                                <h3 className={`text-xl font-bold ${textClass}`}>Edit User: {editingUser.email}</h3>
-                                <p className="text-xs text-slate-500 mt-1">Configure permissions and data access</p>
+                                <h3 className={`text-sm font-bold ${textClass}`}>Edit User: {editingUser.email}</h3>
+                                <p className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">Configuration & Permission Management</p>
                             </div>
-                            <button onClick={() => setEditingUser(null)} className="text-slate-500 hover:text-white"><X size={24} /></button>
+                            <button onClick={() => setEditingUser(null)} className="p-1 rounded-lg hover:bg-white/10 text-slate-500 hover:text-white transition-colors"><X size={16} /></button>
                         </div>
 
-                        <div className="p-6 overflow-y-auto space-y-8 custom-scrollbar">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* LEFT COLUMN: Access & Assets */}
-                                <div className="space-y-6">
+                        {/* Scrollable Body - Hyper Dense Grid */}
+                        <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
 
-                                    {/* User Details */}
-                                    <div className={`p-4 rounded-lg border ${isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                                        <h4 className={`text-sm font-bold mb-3 flex items-center ${textClass}`}>
-                                            <Users size={14} className="mr-2 text-brand-500" />
-                                            Identity
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-4 mb-4">
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">First Name</label>
-                                                <input
-                                                    type="text"
-                                                    value={editForm.first_name || ''}
-                                                    onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                                                    className={`w-full p-2 rounded border text-xs ${inputClass}`}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Last Name</label>
-                                                <input
-                                                    type="text"
-                                                    value={editForm.last_name || ''}
-                                                    onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
-                                                    className={`w-full p-2 rounded border text-xs ${inputClass}`}
-                                                />
-                                            </div>
+                                {/* LEFT: IDENTITY & ACCESS (Cols 7) */}
+                                <div className="md:col-span-7 space-y-3">
+
+                                    {/* 1. Identity Card */}
+                                    <div className={`p-3 rounded-lg border relative overflow-hidden group ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                        <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+                                            <Users size={80} />
                                         </div>
-                                        <div className="mb-4">
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Company / Client Name</label>
-                                            <input
-                                                type="text"
-                                                value={editForm.company || ''}
-                                                onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
-                                                className={`w-full p-2 rounded border text-xs ${inputClass}`}
-                                            />
+                                        <div className="flex items-start gap-3 relaitve z-10">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 shadow-lg ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-white text-slate-500'}`}>
+                                                {(editForm.first_name?.[0] || '')}{(editForm.last_name?.[0] || '')}
+                                            </div>
+                                            <div className="flex-1 space-y-2">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-[8px] font-bold text-slate-500 uppercase mb-0.5">First Name</label>
+                                                        <input type="text" value={editForm.first_name || ''} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })} className={`w-full px-2 py-1 rounded border text-[10px] font-medium ${inputClass}`} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[8px] font-bold text-slate-500 uppercase mb-0.5">Last Name</label>
+                                                        <input type="text" value={editForm.last_name || ''} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })} className={`w-full px-2 py-1 rounded border text-[10px] font-medium ${inputClass}`} />
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-[8px] font-bold text-slate-500 uppercase mb-0.5">Company</label>
+                                                        <input type="text" value={editForm.company || ''} onChange={(e) => setEditForm({ ...editForm, company: e.target.value })} className={`w-full px-2 py-1 rounded border text-[10px] font-medium ${inputClass}`} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[8px] font-bold text-slate-500 uppercase mb-0.5">Role</label>
+                                                        <div className="flex bg-slate-500/10 rounded p-0.5">
+                                                            <button onClick={() => setEditForm({ ...editForm, role: 'admin' })} className={`flex-1 text-[9px] font-bold py-0.5 rounded transition-colors ${editForm.role === 'admin' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}>ADMIN</button>
+                                                            <button onClick={() => setEditForm({ ...editForm, role: 'client' })} className={`flex-1 text-[9px] font-bold py-0.5 rounded transition-colors ${editForm.role === 'client' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}>CLIENT</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Role */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Role</label>
-                                        <div className="flex gap-4">
-                                            <label className={`flex items-center p-3 rounded border cursor-pointer flex-1 transition-colors ${editForm.role === 'admin' ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700'}`}>
-                                                <input type="radio" name="role" checked={editForm.role === 'admin'} onChange={() => setEditForm({ ...editForm, role: 'admin' })} className="mr-2" />
-                                                <span className={textClass}>Admin</span>
+                                    {/* 2. Access Control (Pills) */}
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1">
+                                                <Layers size={10} /> Feature Access
                                             </label>
-                                            <label className={`flex items-center p-3 rounded border cursor-pointer flex-1 transition-colors ${editForm.role === 'client' ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700'}`}>
-                                                <input type="radio" name="role" checked={editForm.role === 'client'} onChange={() => setEditForm({ ...editForm, role: 'client' })} className="mr-2" />
-                                                <span className={textClass}>Client</span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {[
+                                                    { id: 'dashboard', label: 'Overview' },
+                                                    { id: 'campaigns', label: 'Campaign Manager' },
+                                                    { id: 'creative-hub', label: 'Ads Hub' },
+                                                    { id: 'ai-lab', label: 'AI Laboratory' }
+                                                ].map(feat => (
+                                                    <button
+                                                        key={feat.id}
+                                                        onClick={() => toggleArrayItem('allowed_features', feat.id)}
+                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all active:scale-95 ${editForm.allowed_features?.includes(feat.id)
+                                                            ? 'bg-brand-500 text-white border-brand-500 shadow-md shadow-brand-500/20'
+                                                            : isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                                                            }`}
+                                                    >
+                                                        {feat.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1">
+                                                <Layout size={10} /> Profile Views
                                             </label>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {['sales', 'engagement', 'leads', 'messenger'].map(p => (
+                                                    <button
+                                                        key={p}
+                                                        onClick={() => toggleArrayItem('allowed_profiles', p)}
+                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all active:scale-95 capitalize ${editForm.allowed_profiles?.includes(p)
+                                                            ? 'bg-purple-500 text-white border-purple-500 shadow-md shadow-purple-500/20'
+                                                            : isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                                                            }`}
+                                                    >
+                                                        {p}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Ad Accounts Selector with Search */}
+                                    {/* 3. Control Center Grid */}
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Assigned Ad Accounts</label>
+                                        <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1">
+                                            <Settings size={10} /> Control Center
+                                        </label>
+                                        <div className={`grid grid-cols-2 sm:grid-cols-4 gap-1.5`}>
+                                            <div className={`p-1.5 rounded border flex flex-col justify-between ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                                <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">Spend Mult.</span>
+                                                <div className="flex items-center">
+                                                    <span className="text-[10px] text-brand-500 font-bold mr-0.5">x</span>
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        value={editForm.spend_multiplier}
+                                                        onChange={(e) => setEditForm({ ...editForm, spend_multiplier: parseFloat(e.target.value) })}
+                                                        className={`w-full bg-transparent text-xs font-bold focus:outline-none ${textClass}`}
+                                                    />
+                                                </div>
+                                            </div>
 
-                                        {/* Account Search Input */}
-                                        <div className="relative mb-2">
-                                            <Search size={14} className="absolute left-3 top-2.5 text-slate-500" />
+                                            {[
+                                                { label: 'Hide Finance', field: 'hide_total_spend', color: 'text-red-400' },
+                                                { label: 'Disable AI', field: 'disable_ai', color: 'text-orange-400' },
+                                                { label: 'Hide Account Name', field: 'hide_account_name', color: 'text-blue-400' }
+                                            ].map((toggle: any) => (
+                                                <button
+                                                    key={toggle.field}
+                                                    onClick={() => setEditForm({ ...editForm, [toggle.field]: !editForm[toggle.field as keyof UserConfig] })}
+                                                    className={`p-1.5 rounded border flex flex-col justify-between text-left transition-all ${editForm[toggle.field as keyof UserConfig]
+                                                        ? (isDark ? 'bg-slate-800 border-slate-600' : 'bg-slate-50 border-slate-300')
+                                                        : (isDark ? 'bg-slate-900 border-slate-800 opacity-60 hover:opacity-100' : 'bg-white border-slate-100 opacity-60 hover:opacity-100')
+                                                        }`}
+                                                >
+                                                    <span className={`text-[8px] font-bold uppercase truncate ${editForm[toggle.field as keyof UserConfig] ? toggle.color : 'text-slate-500'}`}>{toggle.label}</span>
+                                                    <div className={`w-6 h-3 rounded-full p-0.5 transition-colors ${editForm[toggle.field as keyof UserConfig] ? 'bg-brand-500' : 'bg-slate-600'}`}>
+                                                        <div className={`w-2 h-2 rounded-full bg-white transition-transform ${editForm[toggle.field as keyof UserConfig] ? 'translate-x-3' : ''}`} />
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* RIGHT: DATA & CONSTRAINTS (Cols 5) */}
+                                <div className="md:col-span-5 space-y-3">
+
+                                    {/* 1. Account Selector (Optimized) */}
+                                    <div className="flex flex-col h-56">
+                                        <div className="flex justify-between items-end mb-1.5">
+                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Assigned Accounts</label>
+                                            <span className="text-[8px] font-bold bg-brand-500 text-white px-1.5 py-0.5 rounded">{editForm.ad_account_ids?.length || 0} selected</span>
+                                        </div>
+                                        <div className="relative mb-1.5">
+                                            <Search size={10} className="absolute left-2.5 top-2 text-slate-500" />
                                             <input
                                                 type="text"
-                                                placeholder="Search accounts by name or ID..."
+                                                placeholder="Search..."
                                                 value={accountSearchQuery}
                                                 onChange={(e) => setAccountSearchQuery(e.target.value)}
-                                                className={`w-full pl-9 p-2 rounded border text-xs ${inputClass}`}
+                                                className={`w-full pl-7 py-1 rounded-lg border text-[10px] ${inputClass}`}
                                             />
                                         </div>
-
-                                        {fetchingAccounts ? (
-                                            <div className="p-4 text-center text-slate-500 text-sm italic">Loading accounts...</div>
-                                        ) : (
-                                            <div className={`border rounded-lg max-h-48 overflow-y-auto p-2 space-y-1 ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-300 bg-slate-50'}`}>
-                                                {filteredAccounts.length > 0 ? filteredAccounts.map(acc => (
-                                                    <label key={acc.id} className={`flex items-center p-2 rounded cursor-pointer text-sm ${isDark ? 'hover:bg-slate-700' : 'hover:bg-white'}`}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={editForm.ad_account_ids?.includes(acc.id)}
-                                                            onChange={() => toggleAdAccount(acc.id)}
-                                                            className="mr-2 rounded text-brand-600"
-                                                        />
-                                                        <div className="flex-1 truncate">
-                                                            <span className={textClass}>{acc.name}</span>
-                                                            <span className="text-xs text-slate-500 ml-2">({acc.id})</span>
-                                                        </div>
-                                                    </label>
-                                                )) : (
-                                                    <div className="text-xs text-slate-500 p-2">
-                                                        {availableAccounts.length === 0 ? "No accounts found. Check token." : "No matching accounts."}
+                                        <div className={`border rounded-lg flex-1 overflow-y-auto custom-scrollbar p-1 space-y-0.5 ${isDark ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+                                            {filteredAccounts.length > 0 ? filteredAccounts.map(acc => (
+                                                <label key={acc.id} className={`flex items-center p-1 rounded cursor-pointer group hover:bg-brand-500/10 transition-colors`}>
+                                                    <input type="checkbox" checked={editForm.ad_account_ids?.includes(acc.id)} onChange={() => toggleAdAccount(acc.id)} className="rounded text-brand-600 w-3 h-3 mr-2" />
+                                                    <div className="overflow-hidden">
+                                                        <div className={`text-[10px] font-medium truncate group-hover:text-brand-500 ${textClass}`}>{acc.name}</div>
+                                                        <div className="text-[8px] text-slate-500 font-mono truncate">{acc.id}</div>
                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
-                                        <p className="text-xs text-slate-500 mt-1">{editForm.ad_account_ids?.length || 0} accounts selected.</p>
-                                    </div>
-
-                                    {/* Section Access */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Feature Access (Sections)</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {[
-                                                { id: 'dashboard', label: 'Overview' },
-                                                { id: 'campaigns', label: 'Campaign Manager' },
-                                                { id: 'creative-hub', label: 'Creative Hub' },
-                                                { id: 'ai-lab', label: 'AI Lab' }
-                                            ].map(feat => (
-                                                <label key={feat.id} className={`flex items-center p-2 rounded border cursor-pointer transition-colors ${editForm.allowed_features?.includes(feat.id) ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700'}`}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={editForm.allowed_features?.includes(feat.id)}
-                                                        onChange={() => toggleArrayItem('allowed_features', feat.id)}
-                                                        className="mr-2 rounded text-brand-600"
-                                                    />
-                                                    <span className={`text-sm ${textClass}`}>{feat.label}</span>
                                                 </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* RIGHT COLUMN: Limits & Filters */}
-                                <div className="space-y-6">
-                                    {/* Profile Permissions */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">View Profiles (Dashboard)</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {['sales', 'engagement', 'leads', 'messenger'].map(p => (
-                                                <label key={p} className={`flex items-center p-2 rounded hover:bg-slate-800 cursor-pointer`}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={editForm.allowed_profiles?.includes(p)}
-                                                        onChange={() => toggleArrayItem('allowed_profiles', p)}
-                                                        className="mr-2 rounded text-brand-600"
-                                                    />
-                                                    <span className={`capitalize ${textClass}`}>{p}</span>
-                                                </label>
-                                            ))}
+                                            )) : (
+                                                <div className="p-4 text-center text-[10px] text-slate-500 italic">No accounts</div>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Financial Logic */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Spend Multiplier</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    step="0.1"
-                                                    value={editForm.spend_multiplier}
-                                                    onChange={(e) => setEditForm({ ...editForm, spend_multiplier: parseFloat(e.target.value) })}
-                                                    className={`w-full p-2.5 rounded border text-sm ${inputClass}`}
-                                                />
-                                                <span className="absolute right-3 top-2.5 text-xs text-slate-500">x</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center pt-6">
-                                            <label className="flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={editForm.hide_total_spend}
-                                                    onChange={(e) => setEditForm({ ...editForm, hide_total_spend: e.target.checked })}
-                                                    className="w-5 h-5 rounded text-brand-600 mr-3"
-                                                />
-                                                <div>
-                                                    <span className={`block text-sm font-bold ${textClass}`}>Hide "Total Spend"</span>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {/* Global Constraints */}
-                                    <div className={`p-4 rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                                        <h4 className={`text-sm font-bold mb-4 flex items-center ${textClass}`}>
-                                            <Lock size={14} className="mr-2 text-brand-500" />
-                                            Optional Constraints
+                                    {/* 2. Optional Constraints (Compact) */}
+                                    <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                        <h4 className={`text-[10px] font-bold mb-2 flex items-center ${textClass}`}>
+                                            <Lock size={10} className="mr-1.5 text-brand-500" /> Optional Constraints
                                         </h4>
-
-                                        {/* Date Lock */}
-                                        <div className="mb-4">
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Fixed Date Range (Locks Picker)</label>
-                                            <div className="flex gap-2 items-center">
-                                                <input
-                                                    type="date"
-                                                    value={typeof editForm.fixed_date_start === 'string' ? editForm.fixed_date_start : ''}
-                                                    onChange={(e) => setEditForm({ ...editForm, fixed_date_start: e.target.value })}
-                                                    className={`w-full p-2 rounded border text-xs ${inputClass}`}
-                                                />
-                                                <span className="text-slate-500">-</span>
-                                                <input
-                                                    type="date"
-                                                    value={typeof editForm.fixed_date_end === 'string' ? editForm.fixed_date_end : ''}
-                                                    onChange={(e) => setEditForm({ ...editForm, fixed_date_end: e.target.value })}
-                                                    className={`w-full p-2 rounded border text-xs ${inputClass}`}
-                                                />
+                                        <div className="space-y-2">
+                                            <div>
+                                                <label className="block text-[8px] font-bold text-slate-500 uppercase mb-0.5">Fixed Date Range</label>
+                                                <div className="flex gap-1.5">
+                                                    <input type="date" value={typeof editForm.fixed_date_start === 'string' ? editForm.fixed_date_start : ''} onChange={(e) => setEditForm({ ...editForm, fixed_date_start: e.target.value })} className={`w-full py-0.5 px-1.5 rounded border text-[9px] ${inputClass}`} />
+                                                    <input type="date" value={typeof editForm.fixed_date_end === 'string' ? editForm.fixed_date_end : ''} onChange={(e) => setEditForm({ ...editForm, fixed_date_end: e.target.value })} className={`w-full py-0.5 px-1.5 rounded border text-[9px] ${inputClass}`} />
+                                                </div>
                                             </div>
-                                        </div>
+                                            <div>
+                                                <label className="block text-[8px] font-bold text-slate-500 uppercase mb-0.5">Force Campaigns</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Enter the campaign name..."
+                                                        value={campaignSearch}
+                                                        onChange={(e) => setCampaignSearch(e.target.value)}
+                                                        className={`w-full py-0.5 px-1.5 rounded border text-[9px] ${inputClass}`}
+                                                    />
 
-                                        {/* Campaign Search & Filter */}
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Force Campaigns (Search across accounts)</label>
-
-                                            {/* Search Box */}
-                                            <div className="relative mb-2">
-                                                <Search size={14} className="absolute left-3 top-2.5 text-slate-500" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Type to search campaigns..."
-                                                    value={campaignSearch}
-                                                    onChange={(e) => setCampaignSearch(e.target.value)}
-                                                    className={`w-full pl-9 p-2 rounded border text-xs ${inputClass}`}
-                                                />
-                                                {loadingCampaigns && <div className="absolute right-3 top-2.5 text-[10px] text-slate-500 animate-pulse">Fetching...</div>}
-                                            </div>
-
-                                            {/* Suggestions Dropdown */}
-                                            {campaignSearch.length > 1 && (
-                                                <div className={`max-h-32 overflow-y-auto border rounded mb-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                                                    {accountCampaigns
-                                                        .filter(c => c.name.toLowerCase().includes(campaignSearch.toLowerCase()) && !editForm.global_campaign_filter?.includes(c.id))
-                                                        .slice(0, 10)
-                                                        .map(c => (
-                                                            <div
-                                                                key={c.id}
-                                                                onClick={() => { toggleCampaignFilter(c.id); setCampaignSearch(''); }}
-                                                                className={`p-2 text-xs cursor-pointer ${isDark ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'}`}
-                                                            >
-                                                                {c.name} <span className="opacity-50">({c.id})</span>
-                                                            </div>
-                                                        ))
-                                                    }
-                                                    {accountCampaigns.filter(c => c.name.toLowerCase().includes(campaignSearch.toLowerCase())).length === 0 && (
-                                                        <div className="p-2 text-xs text-slate-500">No matching campaigns found.</div>
+                                                    {/* Campaign Dropdown */}
+                                                    {campaignSearch.length >= 2 && (
+                                                        <div className={`absolute left-0 right-0 top-full mt-1.5 rounded border shadow-xl z-50 max-h-32 overflow-y-auto custom-scrollbar ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                                            {loadingCampaigns ? (
+                                                                <div className="p-2 text-center text-[9px] text-slate-500">Loading...</div>
+                                                            ) : accountCampaigns.filter(c => c.name.toLowerCase().includes(campaignSearch.toLowerCase())).length > 0 ? (
+                                                                accountCampaigns.filter(c => c.name.toLowerCase().includes(campaignSearch.toLowerCase())).map(camp => (
+                                                                    <div
+                                                                        key={camp.id}
+                                                                        onClick={() => {
+                                                                            toggleCampaignFilter(camp.id);
+                                                                            setCampaignSearch('');
+                                                                        }}
+                                                                        className={`px-2 py-1.5 text-[9px] font-medium cursor-pointer hover:bg-brand-500 hover:text-white transition-colors border-b last:border-0 ${isDark ? 'text-slate-300 border-slate-700' : 'text-slate-600 border-slate-100'}`}
+                                                                    >
+                                                                        <div className="truncate">{camp.name}</div>
+                                                                        <div className="text-[7px] opacity-70 font-mono">{camp.id}</div>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <div className="p-2 text-center text-[9px] text-slate-500">No campaigns found</div>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
-                                            )}
-
-                                            {/* Selected Tags */}
-                                            <div className="flex flex-wrap gap-1 mb-2">
-                                                {editForm.global_campaign_filter?.map(id => {
-                                                    const camp = accountCampaigns.find(c => c.id === id);
-                                                    return (
-                                                        <div key={id} className={`text-[10px] px-2 py-1 rounded flex items-center gap-1 ${isDark ? 'bg-brand-900/30 text-brand-300 border border-brand-800' : 'bg-brand-50 text-brand-700 border border-brand-200'}`}>
-                                                            <span className="truncate max-w-[100px]">{camp ? camp.name : id}</span>
-                                                            <button onClick={() => toggleCampaignFilter(id)}><X size={10} /></button>
-                                                        </div>
-                                                    );
-                                                })}
+                                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                                    {editForm.global_campaign_filter?.map(id => {
+                                                        const campaign = accountCampaigns.find(c => c.id === id);
+                                                        return (
+                                                            <span key={id} onClick={() => toggleCampaignFilter(id)} className="text-[8px] px-1.5 py-0.5 bg-brand-500/20 text-brand-500 rounded cursor-pointer hover:bg-red-500/20 hover:text-red-500 truncate max-w-[150px]" title={id}>
+                                                                {campaign ? campaign.name : id}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                            <p className="text-[10px] text-slate-500 mt-1">
-                                                Only selected campaigns will be visible to the user.
-                                            </p>
                                         </div>
                                     </div>
+
                                 </div>
                             </div>
                         </div>
 
-                        <div className={`p-6 border-t flex justify-end gap-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-                            <button onClick={() => setEditingUser(null)} className="px-4 py-2 text-slate-500 hover:text-white">Cancel</button>
-                            <button onClick={handleSaveUser} className="px-6 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold">Save Configuration</button>
+                        {/* Footer */}
+                        <div className={`px-4 py-2 border-t flex justify-end gap-2 rounded-b-xl ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-slate-50'}`}>
+                            <button onClick={() => setEditingUser(null)} className="px-3 py-1 text-[10px] font-bold text-slate-500 hover:text-white transition-colors">Cancel</button>
+                            <button onClick={handleSaveUser} className="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold text-[10px] shadow-lg shadow-brand-500/20 active:scale-95 transition-all">Save Changes</button>
                         </div>
                     </div>
                 </div>
             )}
-            {/* Create User Modal */}
+            {/* Compressed Create User Modal */}
             {showCreateModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-                    <div className={`w-full max-w-lg rounded-xl border shadow-2xl overflow-hidden flex flex-col ${cardClass}`}>
-                        <div className={`p-6 border-b flex justify-between items-center ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+                    <div className={`w-full max-w-md rounded-xl border shadow-2xl overflow-hidden flex flex-col ${cardClass}`}>
+                        <div className={`px-4 py-3 border-b flex justify-between items-center ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
                             <div>
-                                <h3 className={`text-xl font-bold ${textClass}`}>Create New User</h3>
-                                <p className="text-xs text-slate-500 mt-1">Add a new user to the platform.</p>
+                                <h3 className={`text-sm font-bold ${textClass}`}>Create New User</h3>
+                                <p className="text-[9px] text-slate-500 mt-0.5">Add a new user to the platform.</p>
                             </div>
-                            <button onClick={() => setShowCreateModal(false)} className="text-slate-500 hover:text-white"><X size={24} /></button>
+                            <button onClick={() => setShowCreateModal(false)} className="text-slate-500 hover:text-white"><X size={18} /></button>
                         </div>
 
-                        <div className="p-6 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">First Name</label>
+                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">First Name</label>
                                     <input
                                         type="text"
                                         value={createForm.first_name}
                                         onChange={(e) => setCreateForm({ ...createForm, first_name: e.target.value })}
-                                        className={`w-full p-2.5 rounded-lg border text-sm ${inputClass}`}
+                                        className={`w-full px-2 py-1.5 rounded-lg border text-[10px] ${inputClass}`}
                                         placeholder="John"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Last Name</label>
+                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Last Name</label>
                                     <input
                                         type="text"
                                         value={createForm.last_name}
                                         onChange={(e) => setCreateForm({ ...createForm, last_name: e.target.value })}
-                                        className={`w-full p-2.5 rounded-lg border text-sm ${inputClass}`}
+                                        className={`w-full px-2 py-1.5 rounded-lg border text-[10px] ${inputClass}`}
                                         placeholder="Doe"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Company / Client</label>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Company / Client</label>
                                 <input
                                     type="text"
                                     value={createForm.company}
                                     onChange={(e) => setCreateForm({ ...createForm, company: e.target.value })}
-                                    className={`w-full p-2.5 rounded-lg border text-sm ${inputClass}`}
-                                    placeholder="Acme Corp"
+                                    className={`w-full px-2 py-1.5 rounded-lg border text-[10px] ${inputClass}`}
+                                    placeholder="BSocial LLC"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Address</label>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Email Address</label>
                                 <input
                                     type="email"
                                     value={createForm.email}
                                     onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                                    className={`w-full p-2.5 rounded-lg border text-sm ${inputClass}`}
+                                    className={`w-full px-2 py-1.5 rounded-lg border text-[10px] ${inputClass}`}
                                     placeholder="user@example.com"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Password</label>
                                 <input
                                     type="password"
                                     value={createForm.password}
                                     onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                                    className={`w-full p-2.5 rounded-lg border text-sm ${inputClass}`}
+                                    className={`w-full px-2 py-1.5 rounded-lg border text-[10px] ${inputClass}`}
                                     placeholder="••••••••"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Role</label>
-                                <div className="flex gap-4">
-                                    <label className={`flex items-center justify-center p-3 rounded-lg border cursor-pointer flex-1 transition-colors ${createForm.role === 'admin' ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700'}`}>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Role</label>
+                                <div className="flex gap-3">
+                                    <label className={`flex items-center justify-center p-2 rounded-lg border cursor-pointer flex-1 transition-colors ${createForm.role === 'admin' ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700'}`}>
                                         <input type="radio" name="create-role" checked={createForm.role === 'admin'} onChange={() => setCreateForm({ ...createForm, role: 'admin' })} className="hidden" />
                                         <div className="text-center">
-                                            <Shield size={20} className={`mx-auto mb-1 ${createForm.role === 'admin' ? 'text-brand-500' : 'text-slate-500'}`} />
-                                            <span className={`text-xs font-bold ${createForm.role === 'admin' ? 'text-brand-500' : 'text-slate-500'}`}>Admin</span>
+                                            <Shield size={16} className={`mx-auto mb-0.5 ${createForm.role === 'admin' ? 'text-brand-500' : 'text-slate-500'}`} />
+                                            <span className={`text-[9px] font-bold ${createForm.role === 'admin' ? 'text-brand-500' : 'text-slate-500'}`}>Admin</span>
                                         </div>
                                     </label>
-                                    <label className={`flex items-center justify-center p-3 rounded-lg border cursor-pointer flex-1 transition-colors ${createForm.role === 'client' ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700'}`}>
+                                    <label className={`flex items-center justify-center p-2 rounded-lg border cursor-pointer flex-1 transition-colors ${createForm.role === 'client' ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700'}`}>
                                         <input type="radio" name="create-role" checked={createForm.role === 'client'} onChange={() => setCreateForm({ ...createForm, role: 'client' })} className="hidden" />
                                         <div className="text-center">
-                                            <Users size={20} className={`mx-auto mb-1 ${createForm.role === 'client' ? 'text-brand-500' : 'text-slate-500'}`} />
-                                            <span className={`text-xs font-bold ${createForm.role === 'client' ? 'text-brand-500' : 'text-slate-500'}`}>Client</span>
+                                            <Users size={16} className={`mx-auto mb-0.5 ${createForm.role === 'client' ? 'text-brand-500' : 'text-slate-500'}`} />
+                                            <span className={`text-[9px] font-bold ${createForm.role === 'client' ? 'text-brand-500' : 'text-slate-500'}`}>Client</span>
                                         </div>
                                     </label>
                                 </div>

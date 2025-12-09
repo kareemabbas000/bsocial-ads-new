@@ -14,6 +14,30 @@ const Login: React.FC = () => {
     // Specific state to toggle the "Client" visual context
     const [isClientMode, setIsClientMode] = useState(false);
 
+    // New Fields
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [organization, setOrganization] = useState('');
+
+    // Check for signup redirect
+    React.useEffect(() => {
+        const signupSuccess = sessionStorage.getItem('bsocial_signup_success');
+        const signupEmail = sessionStorage.getItem('bsocial_signup_email');
+
+        if (signupSuccess === 'true') {
+            setView('login');
+            if (signupEmail) setEmail(signupEmail);
+            setNotification({
+                type: 'success',
+                message: "Welcome to BSocial! Your account is ready. Please log in to get started."
+            });
+
+            // Clear flags
+            sessionStorage.removeItem('bsocial_signup_success');
+            sessionStorage.removeItem('bsocial_signup_email');
+        }
+    }, []);
+
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -24,9 +48,25 @@ const Login: React.FC = () => {
                 const { error } = await supabase.auth.signUp({
                     email,
                     password,
+                    options: {
+                        data: {
+                            first_name: firstName,
+                            last_name: lastName,
+                            full_name: `${firstName} ${lastName}`,
+                            company: organization
+                        }
+                    }
                 });
                 if (error) throw error;
-                setNotification({ type: 'success', message: "Account created successfully! Redirecting..." });
+
+                // Store state for redirect after re-mount
+                sessionStorage.setItem('bsocial_signup_success', 'true');
+                sessionStorage.setItem('bsocial_signup_email', email);
+
+                // Immediately sign out to prevent auto-login
+                // This triggers App.tsx to unmount/remount Login
+                await supabase.auth.signOut();
+
             } else {
                 const { error } = await supabase.auth.signInWithPassword({
                     email,
@@ -45,6 +85,12 @@ const Login: React.FC = () => {
         setNotification(null);
         setIsClientMode(clientMode);
         setView(newView);
+        // Reset fields
+        setEmail('');
+        setPassword('');
+        setFirstName('');
+        setLastName('');
+        setOrganization('');
     };
 
     // --- SUB-COMPONENTS ---
@@ -86,21 +132,23 @@ const Login: React.FC = () => {
                 <div className="absolute bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] bg-purple-600/10 rounded-full blur-[120px] animate-blob" style={{ animationDelay: '2s' }}></div>
 
                 {/* Header */}
-                <header className="relative z-50 px-6 py-6 md:px-12 flex justify-between items-center max-w-7xl mx-auto">
-                    <Logo />
-                    <div className="flex items-center space-x-4 md:space-x-8">
+                <header className="relative z-50 px-4 py-4 md:px-12 flex justify-between items-center max-w-7xl mx-auto">
+                    <div className="scale-90 md:scale-100 origin-left">
+                        <Logo />
+                    </div>
+                    <div className="flex items-center space-x-2 md:space-x-8">
                         <button onClick={() => switchView('login', true)} className="hidden md:flex text-sm font-medium text-slate-400 hover:text-white transition-colors items-center">
                             <Shield size={14} className="mr-1.5" /> Client Portal
                         </button>
                         <button
                             onClick={() => switchView('login', true)}
-                            className="px-6 py-2.5 rounded-full border border-white/10 hover:border-brand-500/50 bg-white/5 hover:bg-brand-500/10 backdrop-blur-md text-sm font-semibold transition-all hover:shadow-[0_0_20px_rgba(0,85,255,0.3)]"
+                            className="px-3 md:px-6 py-2 md:py-2.5 rounded-full border border-white/10 hover:border-brand-500/50 bg-white/5 hover:bg-brand-500/10 backdrop-blur-md text-xs md:text-sm font-semibold transition-all hover:shadow-[0_0_20px_rgba(0,85,255,0.3)]"
                         >
                             Sign In
                         </button>
                         <button
                             onClick={() => switchView('signup')}
-                            className="px-6 py-2.5 rounded-full bg-brand-600 hover:bg-brand-500 text-white text-sm font-bold shadow-lg shadow-brand-600/20 transition-all hover:scale-105"
+                            className="px-4 md:px-6 py-2 md:py-2.5 rounded-full bg-brand-600 hover:bg-brand-500 text-white text-xs md:text-sm font-bold shadow-lg shadow-brand-600/20 transition-all hover:scale-105 whitespace-nowrap"
                         >
                             Get Started
                         </button>
@@ -305,6 +353,19 @@ const Login: React.FC = () => {
                         {/* Decorative Top Line */}
                         <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${isClientMode ? 'from-purple-500 to-brand-500' : 'from-brand-500 to-cyan-500'}`}></div>
 
+                        {/* Notification Banner */}
+                        {notification && (
+                            <div className="mb-6 animate-fade-in relative z-20">
+                                <NotificationBanner
+                                    type={notification.type}
+                                    message={notification.message}
+                                    onClose={() => setNotification(null)}
+                                    theme="dark"
+                                    inline={true}
+                                />
+                            </div>
+                        )}
+
                         <div className="text-center mb-8">
                             <h3 className="text-2xl font-bold text-white mb-2">
                                 {view === 'login' ? (isClientMode ? 'Client Portal Login' : 'Sign In to ADHub') : 'Create Account'}
@@ -314,18 +375,54 @@ const Login: React.FC = () => {
                             </p>
                         </div>
 
-                        {notification && (
-                            <div className="absolute top-4 left-0 right-0 px-8 z-30">
-                                <NotificationBanner
-                                    type={notification.type}
-                                    message={notification.message}
-                                    onClose={() => setNotification(null)}
-                                    theme="dark"
-                                />
-                            </div>
-                        )}
+
 
                         <form onSubmit={handleAuth} className="space-y-5">
+
+                            {view === 'signup' && (
+                                <div className="space-y-4 animate-slide-up">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">First Name</label>
+                                            <input
+                                                type="text"
+                                                value={firstName}
+                                                onChange={(e) => setFirstName(e.target.value)}
+                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 outline-none transition-all"
+                                                placeholder="John"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Last Name</label>
+                                            <input
+                                                type="text"
+                                                value={lastName}
+                                                onChange={(e) => setLastName(e.target.value)}
+                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 outline-none transition-all"
+                                                placeholder="Doe"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Organization</label>
+                                        <div className="relative group">
+                                            <Target className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-brand-400 transition-colors" size={18} />
+                                            <input
+                                                type="text"
+                                                value={organization}
+                                                onChange={(e) => setOrganization(e.target.value)}
+                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 outline-none transition-all"
+                                                placeholder="BSocial LLC"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Email</label>
                                 <div className="relative group">
