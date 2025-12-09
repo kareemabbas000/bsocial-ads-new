@@ -77,7 +77,7 @@ export const AdSetForm: React.FC<AdSetFormProps> = ({ data, onChange, token, acc
     const addInterest = (interest: any) => {
         const currentInterests = targeting.interests || [];
         if (currentInterests.find((i: any) => i.id === interest.id)) return;
-        onChange({ targeting: { ...targeting, interests: [...currentInterests, { id: interest.id, name: interest.name, audience_size: interest.audience_size }] } });
+        onChange({ targeting: { ...targeting, interests: [...currentInterests, { id: interest.id, name: interest.name }] } });
         setInterestQuery(''); setInterestSuggestions([]);
     };
     const removeInterest = (id: string) => onChange({ targeting: { ...targeting, interests: targeting.interests?.filter((i: any) => i.id !== id) } });
@@ -222,8 +222,8 @@ export const AdSetForm: React.FC<AdSetFormProps> = ({ data, onChange, token, acc
 
                 <div className="space-y-3">
                     <label className={`flex items-start gap-3 cursor-pointer p-3 rounded-lg border transition-all ${!data.targeting?.publisher_platforms
-                            ? (isDark ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200')
-                            : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'
+                        ? (isDark ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200')
+                        : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'
                         }`}>
                         <input type="radio"
                             name="placements"
@@ -237,8 +237,8 @@ export const AdSetForm: React.FC<AdSetFormProps> = ({ data, onChange, token, acc
                     </label>
 
                     <label className={`flex items-start gap-3 cursor-pointer p-3 rounded-lg border transition-all ${!!data.targeting?.publisher_platforms
-                            ? (isDark ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200')
-                            : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'
+                        ? (isDark ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200')
+                        : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'
                         }`}>
                         <input type="radio"
                             name="placements"

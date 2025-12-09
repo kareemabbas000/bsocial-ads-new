@@ -59,7 +59,7 @@ export const resolveDateRange = (selection: DateSelection): { since: string; unt
         case 'this_month': since.setDate(1); break;
         case 'last_month': since.setMonth(today.getMonth() - 1); since.setDate(1); until.setDate(0); break;
         case 'this_year': since.setMonth(0, 1); break;
-        case 'this_year': since.setMonth(0, 1); break;
+
         case 'last_year': since.setFullYear(today.getFullYear() - 1, 0, 1); until.setFullYear(today.getFullYear() - 1, 11, 31); break;
         case 'maximum': since.setFullYear(2005, 0, 1); break; // Fallback for custom range calc if needed
         default: since.setDate(today.getDate() - 30); until.setDate(today.getDate() - 1);
