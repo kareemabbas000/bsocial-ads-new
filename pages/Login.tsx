@@ -345,7 +345,7 @@ const Login: React.FC = () => {
             <div className="w-full lg:w-1/2 flex items-center justify-center p-6 relative z-20">
                 <button
                     onClick={() => switchView('landing')}
-                    className="absolute top-6 left-6 lg:hidden text-slate-400 hover:text-white flex items-center"
+                    className="absolute top-6 left-6 lg:hidden text-slate-400 hover:text-white flex items-center z-50 p-2 -ml-2 rounded-full active:bg-white/10 transition-all"
                 >
                     <ArrowLeft size={18} className="mr-1" /> Back
                 </button>
