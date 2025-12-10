@@ -6,7 +6,14 @@ import { NotificationBanner } from '../components/Modal';
 
 import MetaPartnerBadge from '../components/MetaPartnerBadge';
 
-const Login: React.FC = () => {
+import CookieConsent from '../components/CookieConsent';
+import { Theme } from '../types';
+
+interface LoginProps {
+    theme: Theme;
+}
+
+const Login: React.FC<LoginProps> = ({ theme }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -250,7 +257,7 @@ const Login: React.FC = () => {
                         <FeatureCard
                             icon={BarChart2}
                             title="Predictive Analytics"
-                            desc="Stop analyzing yesterday. Our AI models predict campaign fatigue 48 hours before it kills your ROAS."
+                            desc="Stop analyzing manually. The AI models will predict campaign fatigue 48 hours before it kills your ROAS."
                             delay="0.5s"
                         />
                         <FeatureCard
@@ -261,8 +268,8 @@ const Login: React.FC = () => {
                         />
                         <FeatureCard
                             icon={Zap}
-                            title="Automated Scaling"
-                            desc="Set rules once. Let BSocial handle bid adjustments and budget scaling across 50+ ad accounts."
+                            title="AI Scaling Insights"
+                            desc="Receive intelligent, data-driven tips from our AI to help you scale your campaigns with confidence."
                             delay="0.7s"
                         />
                     </div>
@@ -270,7 +277,7 @@ const Login: React.FC = () => {
 
                 <footer className="relative z-10 border-t border-white/5 py-8 mt-20 bg-slate-950/50 backdrop-blur-lg">
                     <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
-                        <div>&copy; 2024 BSocial ADHub. All rights reserved.</div>
+                        <div>&copy; 2025 - 2026 BSocial ADHub. All rights reserved.</div>
                         <div className="flex space-x-6 mt-4 md:mt-0">
                             <a href="#" className="hover:text-white transition-colors">Privacy</a>
                             <a href="#" className="hover:text-white transition-colors">Terms</a>
@@ -278,6 +285,9 @@ const Login: React.FC = () => {
                         </div>
                     </div>
                 </footer>
+
+                {/* Cookie Consent - Landing View */}
+                <CookieConsent theme={theme} />
             </div>
         );
     }
@@ -513,6 +523,8 @@ const Login: React.FC = () => {
                     </div>
                 </div>
             </div>
+            {/* Cookie Consent - Only on public pages */}
+            <CookieConsent theme={theme} />
         </div>
     );
 };

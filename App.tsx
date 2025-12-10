@@ -14,7 +14,7 @@ import { fetchAccountHierarchy, fetchAdAccounts, clearCache } from './services/m
 import { fetchUserProfile, fetchUserConfig, fetchSystemSetting, updateUserConfig } from './services/supabaseService';
 import LoadingSpinner from './components/LoadingSpinner'; // Added
 import AccessDenied from './components/AccessDenied';
-import CookieConsent from './components/CookieConsent';
+// import CookieConsent from './components/CookieConsent'; // Moved to Login
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -24,16 +24,9 @@ const App: React.FC = () => {
     isConnected: false,
   });
 
-  // Whitelist valid tabs to prevent errors
-  const VALID_TABS = ['dashboard', 'campaigns', 'creative-hub', 'ai-lab', 'admin'];
 
-  const [activeTab, setActiveTab] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('activeTab');
-      if (saved && VALID_TABS.includes(saved)) return saved;
-    }
-    return 'dashboard';
-  });
+
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   const [dateSelection, setDateSelection] = useState<DateSelection>({ preset: 'last_30d' });
 
@@ -270,7 +263,7 @@ const App: React.FC = () => {
   if (loading) return <LoadingSpinner theme={theme} message="Initializing ADHub..." />;
 
   if (!session) {
-    return <Login />;
+    return <Login theme={theme} />;
   }
 
   // Admin View Logic
@@ -401,7 +394,7 @@ const App: React.FC = () => {
       {React.cloneElement(renderContent() as React.ReactElement<any>, { filterLocked: isFilterLocked })}
 
       {/* Global Overlays */}
-      <CookieConsent theme={theme} />
+
     </Layout>
   );
 };
