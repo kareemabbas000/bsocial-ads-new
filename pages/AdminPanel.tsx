@@ -284,14 +284,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
     return (
         <div className="space-y-8 pb-12">
             {/* ... (Previous code remains) ... */}
-            <div className="flex justify-between items-center bg-transparent">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 bg-transparent">
                 <div>
                     <h1 className={`text-3xl font-black tracking-tight ${textClass}`}>Admin Console</h1>
                     <p className="text-slate-500 text-sm mt-1">Manage users, permissions, and system configuration.</p>
                 </div>
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-brand-500/20 transition-all hover:scale-105 active:scale-95"
+                    className="flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-brand-500/20 transition-all hover:scale-105 active:scale-95 w-full md:w-auto justify-center"
                 >
                     <Plus size={18} />
                     <span>Create User</span>
@@ -300,13 +300,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
 
             {/* Compressed System Settings */}
             <div className={`p-4 rounded-xl border ${cardClass}`}>
-                <div className="flex justify-between items-center mb-0">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-0 gap-3 md:gap-0">
                     <h3 className={`text-base font-bold flex items-center ${textClass}`}>
                         <Settings size={18} className="mr-2 text-brand-500" />
                         System Configuration
                     </h3>
-                    <div className="flex gap-2 items-center">
-                        <div className="relative w-96">
+                    <div className="flex w-full md:w-auto gap-2 items-center">
+                        <div className="relative w-full md:w-96">
                             <Key size={14} className="absolute left-2.5 top-2 text-slate-500" />
                             <input
                                 type="password"
@@ -316,7 +316,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
                                 placeholder="Global Meta Access Token"
                             />
                         </div>
-                        <button onClick={handleSaveToken} className="bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs flex items-center shadow-lg shadow-brand-500/20 active:scale-95 transition-all">
+                        <button onClick={handleSaveToken} className="bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs flex items-center shadow-lg shadow-brand-500/20 active:scale-95 transition-all whitespace-nowrap">
                             <Save size={14} className="mr-1.5" /> Save Token
                         </button>
                     </div>

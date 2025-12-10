@@ -192,17 +192,115 @@ export const AdsTable: React.FC<AdsTableProps> = ({ data, isLoading, sortConfig,
 
     return (
         <>
-            <div className={`flex-1 flex flex-col relative overflow-hidden ${isDark ? 'bg-slate-950' : 'bg-slate-50'
-                }`}>
-                <div ref={tableContainerRef} className="overflow-x-auto flex-1 custom-scrollbar relative">
+            <div className={`flex-1 flex flex-col relative overflow-hidden ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
+
+                {/* --- MOBILE VIEW (CARDS) --- */}
+                <div className="md:hidden flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                    {isLoading && data.length === 0 ? (
+                        Array.from({ length: 3 }).map((_, i) => (
+                            <div key={i} className={`h-40 rounded-xl animate-pulse ${isDark ? 'bg-slate-900' : 'bg-white'}`} />
+                        ))
+                    ) : data.length === 0 ? (
+                        <div className="text-center py-10 text-slate-500">No {currentLevel.toLowerCase()}s found.</div>
+                    ) : (
+                        data.map(item => (
+                            <div
+                                key={item.id}
+                                onClick={() => handleDrillDown(item)}
+                                className={`rounded-xl border p-4 shadow-sm active:scale-[0.98] transition-all relative overflow-hidden ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+                                    }`}
+                            >
+                                {/* Selection Overlay */}
+                                {selectedIds.has(item.id) && (
+                                    <div className="absolute inset-0 bg-purple-500/10 pointer-events-none border-2 border-purple-500 rounded-xl" />
+                                )}
+
+                                {/* Card Header */}
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="flex-1 pr-4">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-2 h-2 rounded-full ${item.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                {item.status}
+                                            </span>
+                                        </div>
+                                        <h3 className={`font-bold text-sm leading-tight line-clamp-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                            {item.name}
+                                        </h3>
+                                    </div>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleActionClick(e, item.id); }}
+                                        className={`p-2 rounded-full ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}
+                                    >
+                                        <MoreVertical size={16} />
+                                    </button>
+                                </div>
+
+                                {/* Key Metrics Grid */}
+                                <div className={`grid grid-cols-2 gap-3 mb-3 p-3 rounded-lg ${isDark ? 'bg-slate-950/50' : 'bg-slate-50'}`}>
+                                    <div>
+                                        <div className="text-[10px] text-slate-500 uppercase">Spend</div>
+                                        <div className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                                            {formatCurrency(item.insights?.spend || 0)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] text-slate-500 uppercase">Res.</div>
+                                        <div className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                                            {formatNumber(item.insights?.actions?.[0]?.value || 0)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] text-slate-500 uppercase">ROAS</div>
+                                        <div className={`font-semibold ${(item.insights?.roas || 0) > 2 ? 'text-emerald-500' : isDark ? 'text-slate-200' : 'text-slate-800'
+                                            }`}>
+                                            {formatNumber(item.insights?.roas || 0, 2)}x
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] text-slate-500 uppercase">CPR</div>
+                                        <div className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                                            {formatCurrency(item.insights?.cpc || 0)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Footer Actions */}
+                                <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-700/20">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleEdit(item); }}
+                                        className="text-xs font-medium text-purple-500 hover:text-purple-400 flex items-center gap-1"
+                                    >
+                                        <Edit3 size={12} /> Edit Config
+                                    </button>
+
+                                    {currentLevel !== 'AD' && (
+                                        <div className="flex items-center text-xs text-slate-500 gap-1">
+                                            View {currentLevel === 'CAMPAIGN' ? 'Ad Sets' : 'Ads'} <ChevronRight size={12} />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                    {/* Mobile Load More */}
+                    {!isLoading && hasMore && (
+                        <button onClick={onLoadMore} className="w-full py-3 text-sm text-slate-500 font-medium">
+                            Load More...
+                        </button>
+                    )}
+                </div>
+
+                {/* --- DESKTOP VIEW (TABLE) --- */}
+                <div ref={tableContainerRef} className="hidden md:flex flex-1 overflow-x-auto custom-scrollbar relative">
                     <div className="min-w-max flex flex-col gap-1 pb-4">
                         {/* HEADER */}
                         <div
-                            className={`sticky top-0 z-30 grid items-center gap-0 border-b shadow-lg backdrop-blur-xl ${isDark ? 'bg-slate-950/90 border-slate-800 text-slate-300' : 'bg-slate-50/90 border-slate-200 text-slate-600'}`}
+                            className={`sticky top-0 z-30 grid items-center gap-0 border-b shadow-lg backdrop-blur-xl ${isDark ? 'bg-slate-900/90 border-slate-800 text-slate-300' : 'bg-slate-50/90 border-slate-200 text-slate-600'}`}
                             style={{ gridTemplateColumns: getGridTemplate() }}
                         >
                             {/* Checkbox Header */}
-                            <div className={`sticky left-0 z-40 h-full flex items-center justify-center border-r ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className={`sticky left-0 z-40 h-full flex items-center justify-center border-r ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                 <input
                                     type="checkbox"
                                     checked={allSelected}
@@ -213,7 +311,7 @@ export const AdsTable: React.FC<AdsTableProps> = ({ data, isLoading, sortConfig,
                             </div>
 
                             {/* Actions Header */}
-                            <div className={`sticky left-[40px] z-40 h-full flex items-center justify-center font-bold text-[10px] uppercase tracking-wider border-r ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className={`sticky left-[40px] z-40 h-full flex items-center justify-center font-bold text-[10px] uppercase tracking-wider border-r ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                 Actions
                             </div>
 

@@ -21,7 +21,7 @@ export const AIAnalyst: React.FC<AIAnalystProps> = ({ data, level, onAction }) =
     if (!analysis || data.length === 0) return null;
 
     return (
-        <div className={`rounded-2xl border shadow-2xl transition-all duration-300 p-6 relative overflow-hidden group/analyst ${isDark
+        <div className={`rounded-2xl border shadow-2xl transition-all duration-300 p-4 md:p-6 relative overflow-hidden group/analyst ${isDark
             ? 'bg-slate-900/40 backdrop-blur-xl border-white/10 shadow-black/50'
             : 'bg-white/60 backdrop-blur-xl border-white/40 shadow-purple-500/5'
             }`}>
@@ -38,7 +38,7 @@ export const AIAnalyst: React.FC<AIAnalystProps> = ({ data, level, onAction }) =
                         <div className={`p-2 rounded-lg ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-600'}`}>
                             <BrainCircuit size={20} />
                         </div>
-                        <h3 className={`text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <h3 className={`text-base md:text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                             AI Analyst
                         </h3>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${analysis.score > 80
@@ -49,7 +49,7 @@ export const AIAnalyst: React.FC<AIAnalystProps> = ({ data, level, onAction }) =
                         </span>
                     </div>
 
-                    <p className={`text-lg font-medium leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                    <p className={`text-sm md:text-lg font-medium leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                         {analysis.summary}
                     </p>
 
@@ -144,7 +144,7 @@ export const AIAnalyst: React.FC<AIAnalystProps> = ({ data, level, onAction }) =
                 </div>
 
                 {/* Suggested Prompts / Actions */}
-                <div className={`w-full md:w-80 border-l pl-6 flex flex-col justify-center ${isDark ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                <div className={`w-full md:w-80 md:border-l md:pl-6 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 ${isDark ? 'border-slate-700/50' : 'border-slate-200'}`}>
                     <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                         <MessageSquare size={12} /> Suggested Actions
                     </h4>

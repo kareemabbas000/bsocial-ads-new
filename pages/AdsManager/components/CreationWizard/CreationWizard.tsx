@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { X, ArrowRight, ArrowLeft, Check, Zap, Users, MousePointer } from 'lucide-react';
+import { X, ArrowRight, ArrowLeft, Check, Zap, Users, MousePointer, Loader2 } from 'lucide-react';
 import { CampaignStep } from './CampaignStep';
 import { AdSetStep } from './AdSetStep';
 import { AdStep } from './AdStep';
 import { AdEntityDraft } from '../../../../types';
 import { useAdsManager } from '../../context/AdsManagerContext';
+import { useDrafts } from '../../context/DraftContext';
 
 interface CreationWizardProps {
     isOpen: boolean;
@@ -19,10 +20,12 @@ const STEPS = [
 ];
 
 export const CreationWizard: React.FC<CreationWizardProps> = ({ isOpen, onClose, onSave }) => {
-    const { theme } = useAdsManager();
+    const { theme, accountIds, token } = useAdsManager();
+    const { saveDraft, publishDraft } = useDrafts();
     const isDark = theme === 'dark';
 
     const [currentStep, setCurrentStep] = useState(1);
+    const [isPublishing, setIsPublishing] = useState(false);
     const [reachEstimate, setReachEstimate] = useState<{ users: number; bid_estimate?: any } | null>(null);
     const [formData, setFormData] = useState<any>({
         campaign: {
@@ -68,20 +71,47 @@ export const CreationWizard: React.FC<CreationWizardProps> = ({ isOpen, onClose,
         if (currentStep > 1) setCurrentStep(c => c - 1);
     };
 
-    const handleFinish = () => {
-        console.log("Finishing wizard with data:", formData);
-        onSave(formData);
+    const handleSaveDraft = async () => {
+        // Save to Drafts
+        await saveDraft('CAMPAIGN', formData);
+        onSave(formData); // Optional: Callback for parent
         onClose();
     };
 
+    const handleFinish = async () => {
+        setIsPublishing(true);
+        try {
+            // Save as draft first, then publish
+            const draftId = await saveDraft('CAMPAIGN', formData);
+
+            // Publish using first selected account
+            const accountId = accountIds.length > 0 ? accountIds[0] : '';
+            if (!accountId) throw new Error("No ad account selected");
+
+            const success = await publishDraft(draftId, token, accountId);
+
+            if (success) {
+                onSave(formData);
+                onClose();
+            } else {
+                console.error("Publish failed");
+                // TODO: Show Error Toast (handled by global error boundary or toast provider normally)
+            }
+        } catch (e) {
+            console.error("Critical publish error", e);
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-all duration-300">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm md:p-4 animate-in fade-in duration-200">
             {/* MODAL CONTAINER */}
             <div className={`
-                w-full h-full md:max-w-2xl md:h-[80vh] md:max-h-[700px] mt-16
-                transition-all duration-300 ease-out 
-                flex flex-col md:rounded-xl shadow-2xl overflow-hidden
-                ${isDark ? 'bg-slate-950 border border-slate-800' : 'bg-white border-0'}
+                w-full h-full md:max-w-4xl md:h-[80vh] md:max-h-[700px]
+                md:rounded-2xl shadow-2xl md:border flex flex-col overflow-hidden 
+                transition-all duration-300 transform
+                ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}
             `}>
                 {/* HEADER */}
                 <div className={`
@@ -266,9 +296,10 @@ export const CreationWizard: React.FC<CreationWizardProps> = ({ isOpen, onClose,
 
                     <div className="flex gap-3">
                         <button
-                            onClick={onClose} // Or save draft logic
+                            onClick={handleSaveDraft}
+                            disabled={isPublishing}
                             className={`
-                                hidden md:block px-4 py-2 rounded-lg font-medium text-xs transition-colors
+                                px-4 py-2 rounded-lg font-medium text-xs transition-colors whitespace-nowrap
                                 ${isDark
                                     ? 'text-slate-300 hover:bg-slate-800'
                                     : 'text-slate-600 hover:bg-slate-100'
@@ -279,10 +310,17 @@ export const CreationWizard: React.FC<CreationWizardProps> = ({ isOpen, onClose,
                         </button>
                         <button
                             onClick={currentStep === STEPS.length ? handleFinish : handleNext}
-                            className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold text-xs shadow-lg shadow-blue-600/20 flex items-center gap-2 transform transition-all active:scale-95"
+                            disabled={isPublishing}
+                            className={`
+                                bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold text-xs shadow-lg shadow-blue-600/20 flex items-center gap-2 transform transition-all active:scale-95
+                                ${isPublishing ? 'opacity-50 cursor-wait' : ''}
+                            `}
                         >
-                            {currentStep === STEPS.length ? 'Publish Campaign' : 'Next'}
-                            <ArrowRight size={14} />
+                            {isPublishing ? (
+                                <><Loader2 size={14} className="animate-spin" /> Publishing...</>
+                            ) : (
+                                currentStep === STEPS.length ? 'Publish Campaign' : <>Next <ArrowRight size={14} /></>
+                            )}
                         </button>
                     </div>
                 </div>

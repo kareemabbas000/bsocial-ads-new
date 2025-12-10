@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     LineChart, Line, AreaChart, Area, Cell, Legend, ComposedChart, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Label,
@@ -180,8 +180,12 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     const [placementData, setPlacementData] = useState<any[]>([]);
     const [regionData, setRegionData] = useState<any[]>([]);
 
-    const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+    // AI State
     const [analyzing, setAnalyzing] = useState(false);
+    const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+    const [showAllPlacements, setShowAllPlacements] = useState(false); // Mobile UX: Show all placements
+    const aiAuditRef = useRef<HTMLDivElement>(null); // Mobile UX: Scroll target
+
     const [activeTab, setActiveTab] = useState<'overview' | 'audience' | 'platform' | 'time'>('overview');
 
     const [heatmapMetric, setHeatmapMetric] = useState<'impressions' | 'reach' | 'clicks' | 'ctr'>('impressions');
@@ -519,6 +523,11 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     }, [placementData, profile, multiplier]);
 
     const handleRunAI = async () => {
+        // Mobile UX: Auto-scroll to AI Audit section if layout is stacked (lg breakpoint is 1024px)
+        if (window.innerWidth < 1024 && aiAuditRef.current) {
+            aiAuditRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
         if (campaigns.length === 0) return;
         setAnalyzing(true);
         const result = await analyzeCampaignPerformance(campaigns);
@@ -690,16 +699,34 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                 </div>
 
                 {!disableAi && (
-                    <div className={`flex-1 w-full md:w-auto border rounded-xl px-4 py-2 flex items-center justify-between backdrop-blur-md ${isDark ? 'bg-blue-900/10 border-blue-800/30' : 'bg-blue-50 border-blue-100'}`}>
-                        <div className="flex items-center space-x-3">
-                            <div className={`p-1.5 rounded-full animate-pulse ${isDark ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
-                                <Sparkles size={14} className="text-blue-500" />
+                    <div className="flex-1 w-full md:w-auto">
+                        {/* Desktop Version */}
+                        <div className={`hidden md:flex border rounded-xl px-4 py-2 items-center justify-between backdrop-blur-md ${isDark ? 'bg-blue-900/10 border-blue-800/30' : 'bg-blue-50 border-blue-100'}`}>
+                            <div className="flex items-center space-x-3">
+                                <div className={`p-1.5 rounded-full animate-pulse ${isDark ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
+                                    <Sparkles size={14} className="text-blue-500" />
+                                </div>
+                                <span className={`text-sm font-medium ${isDark ? 'text-blue-200' : 'text-blue-700'}`}>AI has new optimization insights.</span>
                             </div>
-                            <span className={`text-sm font-medium ${isDark ? 'text-blue-200' : 'text-blue-700'}`}>AI has new optimization insights.</span>
+                            <button onClick={handleRunAI} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg shadow-blue-500/20">
+                                View Audit
+                            </button>
                         </div>
-                        <button onClick={handleRunAI} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg shadow-blue-500/20">
-                            View Audit
-                        </button>
+                        {/* Mobile Version - Compact & Fancy */}
+                        <div className={`md:hidden flex items-center justify-between p-3 rounded-xl border relative overflow-hidden ${isDark ? 'bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border-blue-800/50' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100'}`}>
+                            <div className="flex items-center gap-3 relative z-10">
+                                <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/30 animate-pulse">
+                                    <Sparkles size={16} className="text-white" />
+                                </div>
+                                <div>
+                                    <div className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>AI Insights</div>
+                                    <div className={`text-[10px] opacity-80 ${isDark ? 'text-blue-100' : 'text-blue-800'}`}>New optimizations available</div>
+                                </div>
+                            </div>
+                            <button onClick={handleRunAI} className="relative z-10 px-3 py-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-lg shadow-lg shadow-blue-600/30">
+                                View
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -751,7 +778,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
             </div>
 
             {/* Tabs */}
-            <div className={`border-b flex space-x-6 overflow-x-auto ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+            <div className={`border-b flex space-x-6 overflow-x-auto snap-x snap-mandatory scrollbar-hide ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
                 {[
                     { id: 'overview', icon: Zap, label: 'Overview' },
                     { id: 'audience', icon: Users, label: 'Audience' },
@@ -761,7 +788,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
-                        className={`pb-3 text-sm font-medium capitalize transition-colors border-b-2 flex items-center space-x-2 whitespace-nowrap ${activeTab === tab.id
+                        className={`pb-3 text-sm font-medium capitalize transition-colors border-b-2 flex items-center space-x-2 whitespace-nowrap snap-center ${activeTab === tab.id
                             ? styles.tabActive
                             : `${styles.tabInactive} border-transparent`
                             }`}
@@ -1099,7 +1126,9 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                     Placement Performance
                                 </h3>
                                 <p className="text-xs text-slate-500 mb-6">Top performing placements. Analyzing Spend efficiency vs ROAS.</p>
-                                <div className="h-80 w-full">
+
+                                {/* Desktop Chart View */}
+                                <div className="hidden md:block h-80 w-full">
                                     <ResponsiveContainer width="100%" height="100%" debounce={50}>
                                         <ComposedChart data={processedPlacements.slice(0, 8)} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                                             <defs>
@@ -1146,6 +1175,40 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                             )}
                                         </ComposedChart>
                                     </ResponsiveContainer>
+                                </div>
+
+                                {/* Mobile List View - Native Fancy Cards */}
+                                <div className="md:hidden space-y-3">
+                                    {processedPlacements.slice(0, showAllPlacements ? undefined : 6).map((item, idx) => (
+                                        <div key={idx} className={`p-3 rounded-lg border flex items-center justify-between ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-white text-slate-600 shadow-sm'}`}>
+                                                    {idx + 1}
+                                                </div>
+                                                <div>
+                                                    <div className={`text-xs font-bold capitalize ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{item.platform}</div>
+                                                    <div className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{item.position}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-right">
+                                                <div>
+                                                    <div className={`text-[10px] font-bold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{profile === 'sales' ? 'Spend' : 'Reach'}</div>
+                                                    <div className={`text-xs font-mono font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{formatCompact(profile === 'sales' ? item.spend : item.reach)}</div>
+                                                </div>
+                                                <div>
+                                                    <div className={`text-[10px] font-bold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{profile === 'sales' ? 'ROAS' : 'Impr'}</div>
+                                                    <div className={`text-xs font-mono font-bold ${profile === 'sales' && item.roas > 2 ? 'text-emerald-500' : isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                        {profile === 'sales' ? item.roas.toFixed(1) + 'x' : formatCompact(item.impressions)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {!showAllPlacements && processedPlacements.length > 6 && (
+                                        <button onClick={() => setShowAllPlacements(true)} className="w-full py-2 text-center text-xs text-brand-500 font-bold">
+                                            View All Placements
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -1340,7 +1403,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                         return (
                                             <div key={i} className={`group relative rounded-lg border ${colorClass} h-16 flex flex-col items-center justify-center transition-all hover:scale-110 hover:z-10 cursor-default`}>
                                                 <span className="text-[9px] opacity-70 absolute top-1 left-1">{h.hour}h</span>
-                                                <span className="text-xs font-mono">
+                                                <span className={`font-mono ${heatmapMetric === 'ctr' ? 'text-[9px] md:text-xs' : 'text-xs'}`}>
                                                     {formatCompact(val, heatmapMetric === 'ctr' ? 'ctr' : '')}
                                                 </span>
                                                 {/* Tooltip */}
@@ -1360,7 +1423,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
 
                 {/* Right Column: AI Analysis Panel */}
                 {!disableAi && (
-                    <div className="lg:col-span-1">
+                    <div className="lg:col-span-1" ref={aiAuditRef}>
                         <div className={`sticky top-6 border rounded-xl p-0 h-[calc(100vh-12rem)] flex flex-col shadow-2xl overflow-hidden ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xl'}`}>
                             <div className={`p-4 border-b flex items-center justify-between ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                 <div className="flex items-center space-x-2">

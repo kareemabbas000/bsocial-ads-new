@@ -107,20 +107,29 @@ export const fetchAccountHierarchy = async (adAccountIds: string[], token: strin
     const cached = getCache(cacheKey);
     if (cached) return cached as AccountHierarchy;
 
+    const merged: AccountHierarchy = { campaigns: [], adSets: [], ads: [] };
+
+    // Fetch accounts in parallel batches
     const promises = adAccountIds.map(async (accId) => {
         const formattedId = accId.startsWith('act_') ? accId : `act_${accId}`;
 
-        // Parallel fetching for performance and isolation (if one fails, others might succeed)
         try {
+            // Reverted to FLAT fields (campaign_id) as requested by user
+            // This was the "working" state before recent changes
             const [campResponse, adsetResponse, adsResponse] = await Promise.all([
-                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=id,name&limit=1000&access_token=${token}`),
-                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/adsets?fields=id,name,campaign_id&limit=1000&access_token=${token}`),
-                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/ads?fields=id,name,campaign_id,adset_id&limit=1000&access_token=${token}`)
+                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=id,name&limit=500&access_token=${token}`),
+                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/adsets?fields=id,name,campaign_id&limit=500&access_token=${token}`),
+                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/ads?fields=id,name,campaign_id,adset_id&limit=500&access_token=${token}`)
             ]);
 
             const campData = await campResponse.json();
             const adsetData = await adsetResponse.json();
             const adsData = await adsResponse.json();
+
+            // Explicitly log errors to debug "zero" counts
+            if (campData.error) console.error(`[Meta API] Campaign Error ${accId}:`, campData.error);
+            if (adsetData.error) console.error(`[Meta API] AdSet Error ${accId}:`, adsetData.error);
+            if (adsData.error) console.error(`[Meta API] Ads Error ${accId}:`, adsData.error);
 
             return {
                 campaigns: (campData.data || []).map((c: any) => ({
@@ -130,26 +139,23 @@ export const fetchAccountHierarchy = async (adAccountIds: string[], token: strin
                 adSets: (adsetData.data || []).map((a: any) => ({
                     id: a.id,
                     name: a.name,
-                    campaign_id: a.campaign_id // Flat field is safer
+                    campaign_id: a.campaign_id // Flat field
                 })),
                 ads: (adsData.data || []).map((a: any) => ({
                     id: a.id,
                     name: a.name,
-                    campaign_id: a.campaign_id,
-                    adset_id: a.adset_id
+                    campaign_id: a.campaign_id, // Flat field
+                    adset_id: a.adset_id        // Flat field
                 }))
             };
         } catch (e) {
-            console.error(`Error hierarchy for ${accId}`, e);
-            // Return empty if completely failed (network error)
+            console.error(`Hierarchy fetch failed for ${accId}`, e);
             return { campaigns: [], adSets: [], ads: [] };
         }
     });
 
     const results = await Promise.all(promises);
 
-    // Merge
-    const merged: AccountHierarchy = { campaigns: [], adSets: [], ads: [] };
     results.forEach(res => {
         merged.campaigns.push(...res.campaigns);
         merged.adSets.push(...res.adSets);

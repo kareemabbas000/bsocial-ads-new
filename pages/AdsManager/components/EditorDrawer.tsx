@@ -103,7 +103,7 @@ export const EditorDrawer: React.FC<EditorDrawerProps> = ({ isOpen, onClose, edi
                 </div>
 
                 {/* SCROLLABLE CONTENT */}
-                <div className={`flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 ${isDark ? 'bg-slate-900' : 'bg-slate-50/50'}`}>
+                <div className={`flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-8 ${isDark ? 'bg-slate-900' : 'bg-slate-50/50'}`}>
                     {level === 'CAMPAIGN' && (
                         <CampaignEditor
                             data={formData}

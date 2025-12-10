@@ -65,9 +65,10 @@ export const CampaignStrategist: React.FC<CampaignStrategistProps> = ({ isOpen, 
     if (typeof document === 'undefined') return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm md:p-4 animate-in fade-in duration-200">
             <div className={`
-                w-full max-w-4xl h-[80vh] max-h-[700px] rounded-2xl shadow-2xl border flex flex-col overflow-hidden 
+                w-full h-full md:max-w-4xl md:h-[80vh] md:max-h-[700px]
+                md:rounded-2xl shadow-2xl border-0 md:border flex flex-col overflow-hidden 
                 transition-all duration-300 transform
                 ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}
             `}>

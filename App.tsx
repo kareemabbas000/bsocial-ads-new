@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { supabase } from './services/supabaseClient';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -10,9 +11,10 @@ import CreativeHub from './pages/CreativeHub';
 import AdminPanel from './pages/AdminPanel';
 import { AppState, DateSelection, Theme, GlobalFilter, AccountHierarchy, AdAccount } from './types';
 import { fetchAccountHierarchy, fetchAdAccounts, clearCache } from './services/metaService';
-import { fetchUserProfile, fetchUserConfig, fetchSystemSetting } from './services/supabaseService';
+import { fetchUserProfile, fetchUserConfig, fetchSystemSetting, updateUserConfig } from './services/supabaseService';
 import LoadingSpinner from './components/LoadingSpinner'; // Added
 import AccessDenied from './components/AccessDenied';
+import CookieConsent from './components/CookieConsent';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -22,11 +24,27 @@ const App: React.FC = () => {
     isConnected: false,
   });
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // Whitelist valid tabs to prevent errors
+  const VALID_TABS = ['dashboard', 'campaigns', 'creative-hub', 'ai-lab', 'admin'];
+
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('activeTab');
+      if (saved && VALID_TABS.includes(saved)) return saved;
+    }
+    return 'dashboard';
+  });
+
   const [dateSelection, setDateSelection] = useState<DateSelection>({ preset: 'last_30d' });
 
-  // CHANGED: Default theme set to 'dark'
-  const [theme, setTheme] = useState<Theme>('dark');
+  // CHANGED: Default theme set to 'dark', checking localStorage first
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    }
+    return 'dark';
+  });
 
   const [hierarchy, setHierarchy] = useState<AccountHierarchy>({ campaigns: [], adSets: [], ads: [] });
   const [filter, setFilter] = useState<GlobalFilter>({ searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] });
@@ -38,6 +56,15 @@ const App: React.FC = () => {
   // Manual Refresh Trigger
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Persist State
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
   // Sync Theme with Body for Portals
   useEffect(() => {
     if (theme === 'dark') {
@@ -45,9 +72,16 @@ const App: React.FC = () => {
     } else {
       document.body.classList.remove('dark');
     }
-  }, [theme]);
+  }, [theme]); // This keeps the effect for normal re-renders, but flushSync handles the immediate toggle
 
-  // Initialize Session
+
+  // Stabilize Connection State for Listener
+  const isConnectedRef = useRef(appState.isConnected);
+  useEffect(() => {
+    isConnectedRef.current = appState.isConnected;
+  }, [appState.isConnected]);
+
+  // Initialize Session & Auth Listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -61,8 +95,7 @@ const App: React.FC = () => {
       setSession(session);
       if (session) {
         // Optimization: Only re-initialize if user CHANGED or we weren't connected.
-        // This prevents "flicker" on window focus when Supabase just refreshes the token.
-        if (!appState.isConnected) {
+        if (!isConnectedRef.current) {
           initializeUser(session.user.id);
         }
       } else {
@@ -76,7 +109,7 @@ const App: React.FC = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [appState.isConnected]); // Depend on connection state to know if we need to init
+  }, []); // Run once on mount to prevent listener churn
 
   const initializeUser = async (userId: string) => {
     // Fix: Only show full screen loader if we don't have valid state yet. 
@@ -165,21 +198,59 @@ const App: React.FC = () => {
   }, [appState.isConnected, appState.adAccountIds, appState.metaToken, refreshTrigger]);
 
   const handleDisconnect = async () => {
-    await supabase.auth.signOut();
+    // 1. Attempt native sign out (backend)
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Sign out error:", e);
+    }
+
+    // 2. FORCE update local state to redirect immediately
+    // This guarantees the user is taken to Login screen even if backend lags
+    setSession(null);
+    setAppState({ metaToken: null, adAccountIds: [], isConnected: false });
+    setHierarchy({ campaigns: [], adSets: [], ads: [] });
+    setAccountNames([]);
+    setFilter({ searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] });
   };
 
   const toggleTheme = async () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
 
-    // Persist to DB if user is logged in
-    if (session?.user?.id && appState.userRole) {
-      try {
-        await import('./services/supabaseService').then(m => m.updateUserConfig(session.user.id, { theme: newTheme }));
-      } catch (e) {
-        console.error("Failed to save theme preference", e);
+    // 1. Visual Update (Instant)
+    const updateVisuals = () => {
+      setTheme(nextTheme);
+      // Manually toggle body class immediately for the view transition snapshot
+      // (React's useEffect would be too late for the snapshot without flushSync)
+      if (nextTheme === 'dark') document.body.classList.add('dark');
+      else document.body.classList.remove('dark');
+    };
+
+    // 2. Persist to DB (Background)
+    const persistTheme = async () => {
+      if (session?.user?.id && appState.userRole) {
+        try {
+          // Fixed: Use standard import
+          await updateUserConfig(session.user.id, { theme: nextTheme });
+        } catch (e) {
+          console.error("Failed to save theme preference", e);
+        }
       }
+    };
+
+    // 3. Execute Transition
+    if ((document as any).startViewTransition) {
+      (document as any).startViewTransition(() => {
+        flushSync(() => {
+          updateVisuals();
+        });
+      });
+    } else {
+      updateVisuals();
     }
+
+    // Fire and forget persistence
+    persistTheme();
   };
 
   const handleManualRefresh = () => {
@@ -189,11 +260,6 @@ const App: React.FC = () => {
     if (appState.isConnected && appState.metaToken) {
       fetchAdAccounts(appState.metaToken).then(accounts => {
         // Update appState if needed? 
-        // We just need to ensure cache is cleared. fetchAdAccounts usually not cached.
-        // But doing it here ensures the "All Data" promise.
-        // setAccountNames(accounts...) logic is inside initializeUser, maybe overly complex to replicate.
-        // For now, clearing cache and refreshTrigger handles the hierarchy.
-        // Let's just rely on refreshTrigger to reload everything that depends on it.
       });
     }
 
@@ -240,6 +306,12 @@ const App: React.FC = () => {
   const renderContent = () => {
     const allowed = allowedFeatures || [];
     const isAdmin = appState.userRole === 'admin';
+
+    // Guard: Ensure we have a token before rendering data-heavy components (unless Admin Panel?)
+    // This prevents "Empty Page" if connection is lost but session exists.
+    if (!appState.metaToken && activeTab !== 'admin') {
+      return <LoadingSpinner theme={theme} message="Connecting to Meta..." />;
+    }
 
     switch (activeTab) {
       case 'dashboard':
@@ -327,6 +399,9 @@ const App: React.FC = () => {
       hideAccountName={appState.userConfig?.hide_account_name}
     >
       {React.cloneElement(renderContent() as React.ReactElement<any>, { filterLocked: isFilterLocked })}
+
+      {/* Global Overlays */}
+      <CookieConsent theme={theme} />
     </Layout>
   );
 };

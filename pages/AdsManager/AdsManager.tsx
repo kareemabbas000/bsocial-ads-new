@@ -39,6 +39,7 @@ const AdsManagerContent: React.FC = () => {
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isAIStudioOpen, setAIStudioOpen] = useState(false);
     const [aiPrompt, setAiPrompt] = useState<string>('');
+    const [isMobileAiExpanded, setIsMobileAiExpanded] = useState(false); // Mobile Collapsible State
 
     // Pagination (Client Side Slicing)
     const [limit, setLimit] = useState(25);
@@ -190,48 +191,75 @@ const AdsManagerContent: React.FC = () => {
             <div className={`flex-none flex flex-col gap-2 p-2 border-b ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
 
                 {/* AI Analyst - Floating or Embedded */}
+                {/* AI Analyst - Floating or Embedded */}
                 <div className="animate-in slide-in-from-top-4 duration-500">
-                    <AIAnalyst
-                        data={data}
-                        level={currentLevel}
-                        onAction={(prompt) => {
-                            setAiPrompt(prompt);
-                            setAIStudioOpen(true);
-                        }}
-                    />
+                    {/* Mobile Collapsible Header */}
+                    <div className="md:hidden mb-2">
+                        <button
+                            onClick={() => setIsMobileAiExpanded(!isMobileAiExpanded)}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 shadow-sm ${theme === 'dark'
+                                ? 'bg-gradient-to-r from-slate-900 to-slate-800 border-slate-700 text-slate-200'
+                                : 'bg-white border-slate-200 text-slate-700'}`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className={`p-1.5 rounded-lg ${theme === 'dark' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                                    <Sparkles size={16} />
+                                </div>
+                                <span className="font-bold text-sm bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
+                                    AI Analyst Insights
+                                </span>
+                            </div>
+                            <ChevronDown
+                                size={18}
+                                className={`text-slate-400 transition-transform duration-300 ${isMobileAiExpanded ? 'rotate-180' : ''}`}
+                            />
+                        </button>
+                    </div>
+
+                    {/* Content - Hidden on mobile unless expanded, Always visible on desktop */}
+                    <div className={`${isMobileAiExpanded ? 'block' : 'hidden'} md:block transition-all duration-300`}>
+                        <AIAnalyst
+                            data={data}
+                            level={currentLevel}
+                            onAction={(prompt) => {
+                                setAiPrompt(prompt);
+                                setAIStudioOpen(true);
+                            }}
+                        />
+                    </div>
                 </div>
 
-                <div className="flex justify-between items-end">
-                    <div className="flex-1">
+                <div className="flex flex-col md:flex-row gap-3 md:gap-0 justify-between items-start md:items-end">
+                    <div className="w-full md:flex-1">
                         <AdsNavigator />
                     </div>
 
                     {/* SEARCH BAR */}
-                    <div className="mx-4 flex-1 max-w-sm relative">
+                    <div className="w-full md:mx-4 md:flex-1 md:max-w-sm relative order-3 md:order-none">
                         <input
                             type="text"
                             placeholder={`Search ${currentLevel.toLowerCase()}s...`}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className={`w-full border rounded-lg py-1.5 px-3 text-sm focus:border-purple-500 outline-none shadow-inner transition-colors ${theme === 'dark'
+                            className={`w-full border rounded-lg py-2 md:py-1.5 px-3 text-sm focus:border-purple-500 outline-none shadow-inner transition-colors ${theme === 'dark'
                                 ? 'bg-slate-900 border-slate-700 text-slate-200'
                                 : 'bg-white border-slate-200 text-slate-800'
                                 }`}
                         />
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-full md:w-auto overflow-x-auto md:overflow-visible pb-1 md:pb-0 no-scrollbar order-2 md:order-none">
                         <button
                             onClick={() => setAIStudioOpen(true)}
-                            className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg shadow-purple-500/25 transition-all border border-purple-400/20 hover:scale-105 active:scale-95"
+                            className="whitespace-nowrap flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg shadow-purple-500/25 transition-all border border-purple-400/20 hover:scale-105 active:scale-95"
                         >
                             <Sparkles size={14} /> AI Planner
                         </button>
-                        <div className="w-px bg-slate-800 mx-1" />
+                        <div className="hidden md:block w-px bg-slate-800 mx-1" />
                         <MetricsSelector />
                         <button
                             onClick={() => setWizardOpen(true)}
-                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95"
+                            className="whitespace-nowrap flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95"
                         >
                             <Plus size={16} /> Create
                         </button>
@@ -258,16 +286,24 @@ const AdsManagerContent: React.FC = () => {
             <CreationWizard
                 isOpen={isWizardOpen}
                 onClose={() => setWizardOpen(false)}
-                onSave={(draft) => console.log(draft)}
+                // onSave handled internally via context or we can pass refresh trigger
+                onSave={(draft) => {
+                    // Maybe trigger refresh if published?
+                    console.log("Wizard action complete", draft);
+                }}
             />
         </div>
     );
 };
 
+import { DraftProvider } from './context/DraftContext';
+
 export const AdsManager: React.FC<AdsManagerProps> = (props) => {
     return (
         <AdsManagerProvider {...props}>
-            <AdsManagerContent />
+            <DraftProvider>
+                <AdsManagerContent />
+            </DraftProvider>
         </AdsManagerProvider>
     );
 };
