@@ -8,8 +8,16 @@ export const formatCurrency = (value: string | number): string => {
     }).format(num);
 };
 
-export const formatNumber = (value: string | number): string => {
+export const formatNumber = (value: string | number, decimals?: number): string => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(num)) return '0';
+
+    if (typeof decimals === 'number') {
+        return new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        }).format(num);
+    }
+
     return new Intl.NumberFormat('en-US').format(num);
 };
