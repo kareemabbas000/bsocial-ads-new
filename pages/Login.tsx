@@ -4,6 +4,8 @@ import { supabase } from '../services/supabaseClient';
 import { ArrowRight, AlertCircle, Mail, Lock, Zap, BarChart2, Target, CheckCircle2, ChevronRight, Play, ArrowLeft, Shield } from 'lucide-react';
 import { NotificationBanner } from '../components/Modal';
 
+import MetaPartnerBadge from '../components/MetaPartnerBadge';
+
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -186,6 +188,11 @@ const Login: React.FC = () => {
                             </div>
                             <span>Client Login</span>
                         </button>
+                    </div>
+
+                    {/* Meta Partner Badge */}
+                    <div className="mt-12 md:mt-16 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+                        <MetaPartnerBadge />
                     </div>
 
                     {/* Dashboard Preview / Floating UI Element */}
