@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Megaphone, Zap, Settings, LogOut, Layers, Calendar, Command, Sun, Moon, Menu, ChevronLeft, ChevronRight, Shield, Radio, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { LayoutDashboard, Megaphone, Zap, Settings, LogOut, Layers, Calendar, Command, Sun, Moon, Menu, ChevronLeft, ChevronRight, Shield, Radio, CheckCircle2, RefreshCw, FileText } from 'lucide-react';
 import { DateSelection, Theme, GlobalFilter as GlobalFilterType, AccountHierarchy } from '../types';
 import CommandBar from './CommandBar';
 import GlobalFilter from './GlobalFilter';
@@ -34,6 +35,9 @@ interface LayoutProps {
 
   // New: Hide Account Name
   hideAccountName?: boolean;
+
+  // New: Navigation Mode
+  navigationMode?: 'state' | 'router';
 }
 
 const Layout: React.FC<LayoutProps> = ({
@@ -41,16 +45,26 @@ const Layout: React.FC<LayoutProps> = ({
   dateSelection, onDateChange, theme, onThemeToggle,
   hierarchy, filter, onFilterChange, userRole,
   allowedFeatures, isDateLocked, accountNames = [],
-  onManualRefresh, hideAccountName
+  onManualRefresh, hideAccountName, navigationMode = 'state'
 }) => {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Desktop state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    // Persist state: recover from storage or default to false
+    const saved = localStorage.getItem('isSidebarCollapsed');
+    return saved === 'true';
+  });
+
+  // Save sidebar state on change
+  useEffect(() => {
+    localStorage.setItem('isSidebarCollapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   const allNavItems = [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'campaigns', label: 'Campaign Manager', icon: Layers },
-    { id: 'creative-hub', label: 'Ads Hub', icon: Megaphone },
+    { id: 'ads-hub', label: 'Ads Hub', icon: Megaphone },
+    { id: 'report-kitchen', label: 'Report Kitchen', icon: FileText },
     { id: 'ai-lab', label: 'AI Laboratory', icon: Zap },
   ];
 
@@ -59,7 +73,14 @@ const Layout: React.FC<LayoutProps> = ({
     // If no config provided (legacy/admin self), show all. 
     // If config provided, strictly filter.
     if (!allowedFeatures) return true;
-    return allowedFeatures.includes(item.id);
+
+    // Legacy Compatibility Check
+    const legacyMap: Record<string, string> = {
+      'ads-hub': 'creative-hub',
+      'report-kitchen': 'reporting-engine'
+    };
+
+    return allowedFeatures.includes(item.id) || (legacyMap[item.id] && allowedFeatures.includes(legacyMap[item.id]));
   });
 
   if (userRole === 'admin') {
@@ -85,13 +106,13 @@ const Layout: React.FC<LayoutProps> = ({
 
   const NavContent = () => (
     <>
-      <div className={`transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)] flex items-center justify-between ${isSidebarCollapsed ? 'p-4 justify-center' : 'p-6'}`} style={{ willChange: 'padding, justify-content' }}>
-        <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'space-x-3'}`}>
+      <div className={`transition-all duration-300 ease-in-out flex items-center ${isSidebarCollapsed ? 'w-full justify-center py-6 px-0' : 'w-full justify-between p-6'}`}>
+        <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center w-full' : 'space-x-3'}`}>
           {/* BSocial Logo */}
           <img
-            src="https://vslsjgfhwknxjhtxlhhk.supabase.co/storage/v1/object/public/logos/Logo%20Bsocial%20Icon%20new.png"
+            src="https://icgkbruoltgvchbqednf.supabase.co/storage/v1/object/public/logos/Logo%20Bsocial%20Icon%20new.png"
             alt="BSocial Logo"
-            className="w-10 h-10 rounded-full object-contain bg-slate-900 shadow-lg shadow-blue-500/30 shrink-0 border border-white/10"
+            className={`rounded-full object-contain bg-slate-900 shadow-lg shadow-blue-500/30 shrink-0 border border-white/10 ${isSidebarCollapsed ? 'w-10 h-10' : 'w-10 h-10'}`}
           />
 
           {!isSidebarCollapsed && (
@@ -105,15 +126,15 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
       </div>
 
-      <div className="px-4 mb-4">
+      <div className={`px-4 mb-4 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
         <button
           onClick={() => setIsCommandOpen(true)}
-          className={`w-full border text-sm py-2 px-3 rounded-md flex items-center transition-all group ${theme === 'dark'
+          className={`border text-sm py-2 px-3 rounded-md flex items-center transition-all group ${theme === 'dark'
             ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
             : 'bg-white border-slate-200 hover:border-brand-300 hover:shadow-sm text-slate-600'
-            } ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}
+            } ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full justify-between'}`}
         >
-          <div className="flex items-center">
+          <div className="flex items-center justify-center">
             <Command size={14} className={`${isSidebarCollapsed ? '' : 'mr-2'} group-hover:text-brand-500`} />
             {!isSidebarCollapsed && <span>Search...</span>}
           </div>
@@ -121,26 +142,22 @@ const Layout: React.FC<LayoutProps> = ({
         </button>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="flex-1 px-3 space-y-1 w-full flex flex-col items-center">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                onNavigate(item.id);
-                setIsSidebarOpen(false); // Close mobile menu on click
-              }}
-              className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium group relative ${isActive
-                ? theme === 'dark'
-                  ? 'bg-brand-900/20 text-brand-100 border border-brand-500/20 shadow-sm'
-                  : 'bg-brand-50 text-brand-700 border border-brand-200 shadow-sm'
-                : theme === 'dark'
-                  ? 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-                  : 'text-slate-500 hover:bg-slate-100 hover:text-brand-900'
-                } ${isSidebarCollapsed ? 'justify-center' : 'space-x-3'}`}
-            >
+
+          const sharedClasses = `flex items-center transition-all duration-200 text-sm font-semibold group relative overflow-hidden backdrop-blur-sm ${isActive
+            ? theme === 'dark'
+              ? 'bg-brand-500/10 text-white shadow-[inset_0_0_20px_rgba(59,130,246,0.1)] border border-brand-500/20 shadow-brand-500/10'
+              : 'bg-white/60 text-brand-700 border border-white/50 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md'
+            : theme === 'dark'
+              ? 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent hover:border-white/5'
+              : 'text-slate-500 hover:bg-white/40 hover:text-brand-800 border border-transparent hover:border-white/30'
+            } ${isSidebarCollapsed ? 'justify-center w-12 h-12 rounded-xl p-0' : 'space-x-3 w-full px-4 py-3.5 rounded-2xl'}`;
+
+          const content = (
+            <>
               <Icon size={18} className={`shrink-0 ${isActive ? 'text-brand-500' : 'text-slate-400 group-hover:text-brand-400'}`} />
               {!isSidebarCollapsed && <span>{item.label}</span>}
 
@@ -150,22 +167,48 @@ const Layout: React.FC<LayoutProps> = ({
                   {item.label}
                 </div>
               )}
+            </>
+          );
+
+          if (navigationMode === 'router') {
+            return (
+              <Link
+                key={item.id}
+                to={`/${item.id === 'dashboard' ? '' : item.id}`}
+                className={sharedClasses}
+                onClick={() => setIsSidebarOpen(false)}
+              >
+                {content}
+              </Link>
+            );
+          }
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                onNavigate(item.id);
+                setIsSidebarOpen(false); // Close mobile menu on click
+              }}
+              className={sharedClasses}
+            >
+              {content}
             </button>
           );
         })}
       </nav>
 
-      <div className={`p-4 border-t flex flex-col gap-2 ${borderClass}`}>
+      <div className={`p-4 border-t flex flex-col gap-2 w-full ${borderClass}`}>
         {onManualRefresh && (
           <button
             onClick={onManualRefresh}
-            className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all ${theme === 'dark'
+            className={`flex items-center rounded-lg text-xs font-medium transition-all ${theme === 'dark'
               ? 'bg-slate-900 text-slate-400 hover:text-white border border-transparent'
               : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm'
-              } ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}
+              } ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full px-3 py-2 justify-between'}`}
             title="Refresh Data"
           >
-            <span className="flex items-center">
+            <span className="flex items-center justify-center">
               <span className={isSidebarCollapsed ? '' : 'mr-2'}><RefreshCw size={14} /></span>
               {!isSidebarCollapsed && 'Refresh Data'}
             </span>
@@ -174,12 +217,12 @@ const Layout: React.FC<LayoutProps> = ({
 
         <button
           onClick={onThemeToggle}
-          className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all ${theme === 'dark'
+          className={`flex items-center rounded-lg text-xs font-medium transition-all ${theme === 'dark'
             ? 'bg-slate-900 text-slate-400 hover:text-white border border-transparent'
             : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm'
-            } ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}
+            } ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full px-3 py-2 justify-between'}`}
         >
-          <span className="flex items-center">
+          <span className="flex items-center justify-center">
             <span className={isSidebarCollapsed ? '' : 'mr-2'}>{theme === 'dark' ? <Moon size={14} /> : <Sun size={14} className="text-orange-500" />}</span>
             {!isSidebarCollapsed && (theme === 'dark' ? 'Dark Mode' : 'Light Mode')}
           </span>
@@ -192,7 +235,7 @@ const Layout: React.FC<LayoutProps> = ({
 
         <button
           onClick={onDisconnect}
-          className={`w-full flex items-center space-x-2 px-4 py-2 text-xs font-medium text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ${isSidebarCollapsed ? 'justify-center' : 'justify-center'}`}
+          className={`flex items-center space-x-2 text-xs font-medium text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full px-4 py-2 justify-center'}`}
         >
           <LogOut size={14} />
           {!isSidebarCollapsed && <span>Sign Out</span>}
@@ -217,23 +260,35 @@ const Layout: React.FC<LayoutProps> = ({
 
       {/* Sidebar - Mobile (Slide Over) & Desktop (Fixed/Collapsible) */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col border-r transform transition-all duration-300 ease-in-out ${sidebarBg} ${borderClass} 
-        ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'} 
-        ${isSidebarCollapsed ? 'w-20' : 'w-64'}
+        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col border-r transform transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${theme === 'dark'
+          ? 'bg-[#0B0E16]/60 border-white/5 backdrop-blur-3xl shadow-[5px_0_30px_0_rgba(0,0,0,0.5)]'
+          : 'bg-white/50 border-white/20 backdrop-blur-3xl shadow-[5px_0_30px_0_rgba(0,0,0,0.05)]'
+          } 
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} 
+        ${isSidebarCollapsed ? 'w-24' : 'w-80'}
         `}
       >
-        <NavContent />
+        {/* Glass Reflection / Noise Layer */}
+        <div className={`absolute inset-0 pointer-events-none z-0 ${theme === 'dark' ? 'bg-gradient-to-b from-white/[0.01] to-transparent' : 'bg-gradient-to-b from-white/40 to-transparent'}`}></div>
 
-        {/* Floating Collapse Toggle on Border - Enhanced UI */}
+        <div className="relative z-10 flex flex-col h-full">
+          <NavContent />
+        </div>
+
+        {/* Ambient Glow for Dark Mode Sidebar */}
+        {theme === 'dark' && (
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_0%_0%,rgba(2,6,23,0.4),transparent_50%)] pointer-events-none"></div>
+        )}
+
+        {/* Floating Collapse Toggle - Glass Pill */}
         <button
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className={`hidden md:flex absolute -right-3 top-24 z-50 p-1 rounded-full border shadow-sm transition-all ${theme === 'dark'
-            ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'
-            : 'bg-white border-slate-200 text-slate-400 hover:text-brand-600 hover:border-brand-200'
+          className={`hidden md:flex items-center justify-center absolute -right-3 top-24 z-50 w-6 h-6 rounded-full border shadow-lg backdrop-blur-md transition-all hover:scale-110 ${theme === 'dark'
+            ? 'bg-slate-900/80 border-white/10 text-slate-400 hover:text-white hover:border-brand-500/50 shadow-black/50'
+            : 'bg-white/80 border-white/60 text-slate-500 hover:text-brand-600 hover:border-brand-200 shadow-slate-200/50'
             }`}
-          title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
         >
-          {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {isSidebarCollapsed ? <ChevronRight size={10} /> : <ChevronLeft size={10} />}
         </button>
       </aside>
 
@@ -241,31 +296,36 @@ const Layout: React.FC<LayoutProps> = ({
       <main className={`flex-1 flex flex-col relative overflow-hidden ${bgClass} w-full`}>
 
         {/* Top Bar - Responsive */}
-        <header className={`min-h-[4rem] border-b backdrop-blur-xl flex flex-col md:flex-row items-center justify-between px-4 md:px-8 z-20 transition-colors gap-2 md:gap-4 py-2 ${theme === 'dark' ? 'border-slate-800/60 bg-slate-950/30' : 'border-slate-200/60 bg-white/70'
+        {/* Top Bar - Native macOS Style Glass */}
+        <header className={`min-h-[5rem] flex flex-col md:flex-row items-center justify-between px-6 md:px-8 z-20 transition-all gap-4 py-3 sticky top-0 relative ${theme === 'dark'
+          ? 'bg-[#0B0E16]/50 border-b border-white/5 backdrop-blur-3xl supports-[backdrop-filter]:bg-[#0B0E16]/30'
+          : 'bg-white/90 border-b border-slate-200/60 backdrop-blur-3xl supports-[backdrop-filter]:bg-white/80 shadow-sm'
           }`}>
-          <div className="flex items-center w-full md:w-auto justify-between md:justify-start space-x-4">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center w-full md:w-auto justify-between md:justify-start space-x-4 max-w-2xl flex-1">
+            <div className="flex items-center gap-3 w-full">
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="md:hidden p-2 -ml-2 text-slate-500 hover:text-brand-500"
+                className="md:hidden p-2 -ml-2 text-slate-500 hover:text-brand-500 transition-colors"
               >
                 <Menu size={24} />
               </button>
 
-              <div className="flex items-center space-x-2 text-sm">
-                {/* Integrated Global Filter */}
-                <GlobalFilter
-                  hierarchy={hierarchy}
-                  filter={filter}
-                  onChange={onFilterChange}
-                  theme={theme}
-                  locked={isDateLocked} // Use date lock here as heuristic for "Admin Configured"
-                />
+              <div className="flex items-center gap-3 text-sm flex-1">
+                {/* Integrated Global Filter - Enhanced Container */}
+                <div className={`flex relative transition-all duration-300 ${theme === 'dark' ? 'hover:shadow-[0_0_15px_rgba(59,130,246,0.1)]' : ''}`}>
+                  <GlobalFilter
+                    hierarchy={hierarchy}
+                    filter={filter}
+                    onChange={onFilterChange}
+                    theme={theme}
+                    locked={isDateLocked}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Date Selector moved here on Mobile for better top bar balance */}
+            {/* Date Selector moved here on Mobile */}
             <div className="md:hidden">
               <DateRangeSelector
                 selection={dateSelection}
@@ -276,19 +336,18 @@ const Layout: React.FC<LayoutProps> = ({
             </div>
           </div>
 
-          {/* Account Display */}
+          {/* Account Display - ABSOLUTE CENTER */}
           {accountNames && accountNames.length > 0 && !hideAccountName && (
-            <div className={`hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-full border text-xs font-medium max-w-xs truncate ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
-              <CheckCircle2 size={12} className="text-green-500" />
+            <div className={`hidden lg:flex absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center space-x-2 px-4 py-2 rounded-full border backdrop-blur-md text-xs font-semibold max-w-md truncate ${theme === 'dark' ? 'bg-[#0B0E16]/80 border-brand-500/20 text-brand-100' : 'bg-white/80 border-brand-200 text-brand-800'}`}>
+              <CheckCircle2 size={14} className="text-emerald-500 animate-pulse" />
               <span className="truncate">
-                Viewing: {accountNames.join(', ')}
+                Viewing: <span className={theme === 'dark' ? 'text-white' : 'text-slate-900'}>{accountNames.join(', ')}</span>
               </span>
             </div>
           )}
 
           {/* Desktop Date Selector Position */}
-          <div className="hidden md:flex items-center space-x-3">
-            <div className="text-xs text-slate-500 font-medium uppercase tracking-wide">Period</div>
+          <div className="hidden md:flex items-center space-x-4">
             <DateRangeSelector
               selection={dateSelection}
               onChange={onDateChange}
@@ -298,31 +357,22 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
         </header>
 
-        {/* Live Data Strip - Modern, Simple, Attractive */}
-        <div className={`w-full py-1 flex items-center justify-center space-x-2 z-10 transition-colors border-b ${theme === 'dark'
-          ? 'bg-slate-950 border-slate-800/80 text-brand-400'
-          : 'bg-brand-50/50 border-brand-100 text-brand-600'
-          }`}>
-          <div className={`flex items-center px-3 py-0.5 rounded-full border shadow-sm ${theme === 'dark'
-            ? 'bg-slate-900 border-slate-800'
-            : 'bg-white border-brand-200'
+        {/* Live Data Strip - Redesigned: 'Holographic Laser Line' */}
+        <div className={`w-full h-px relative flex items-center justify-center z-30 mt-6 mb-2 ${theme === 'dark' ? 'bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent' : 'bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent'}`}>
+          <div className={`absolute -top-3 px-3 py-1 rounded-full border shadow-[0_0_15px_rgba(16,185,129,0.2)] flex items-center gap-2 backdrop-blur-md ${theme === 'dark'
+            ? 'bg-[#0B0E16]/80 border-emerald-500/20 text-emerald-400'
+            : 'bg-white/80 border-emerald-500/30 text-emerald-600'
             }`}>
-            <span className="relative flex h-2 w-2 mr-2">
+            <div className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span className={`text-[10px] font-bold uppercase tracking-widest ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-              Live Realtime Data
-            </span>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest">Live Realtime Data</span>
           </div>
         </div>
 
         <div className="flex-1 overflow-auto relative custom-scrollbar w-full">
-          {/* Subtle ambient background */}
-          <div className={`absolute inset-0 pointer-events-none transition-opacity duration-500 ${theme === 'dark'
-            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-900/10 via-slate-950/0 to-slate-950/0 opacity-100'
-            : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-100/40 via-white/0 to-white/0 opacity-100'
-            }`} />
+
 
           {/* For Campaign Manager, use full width/height without padding/constraints for 'Sheet' feel */}
           {activeTab === 'campaigns' ? (

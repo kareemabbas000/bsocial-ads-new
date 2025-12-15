@@ -33,7 +33,7 @@ const CommandBar: React.FC<CommandBarProps> = ({ onNavigate, isOpen, onClose, th
   const actions = [
     { id: 'dashboard', label: 'Go to Dashboard', icon: LayoutDashboard, type: 'nav' },
     { id: 'campaigns', label: 'Manage Campaigns', icon: Layers, type: 'nav' },
-    { id: 'creative-hub', label: 'Creative Analysis', icon: Megaphone, type: 'nav' },
+    { id: 'ads-hub', label: 'Ads Hub', icon: Megaphone, type: 'nav' },
     { id: 'audit', label: 'Run AI Account Audit', icon: Zap, type: 'action' },
     { id: 'optimize', label: 'Generate Optimization Report', icon: Zap, type: 'action' },
   ];
@@ -83,8 +83,8 @@ const CommandBar: React.FC<CommandBarProps> = ({ onNavigate, isOpen, onClose, th
               className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg ${itemHover} transition-colors text-left group`}
             >
               <div className={`p-2 rounded-md ${action.type === 'action'
-                  ? (theme === 'dark' ? 'bg-brand-500/10 text-brand-400' : 'bg-brand-50 text-brand-600')
-                  : (theme === 'dark' ? 'bg-slate-700/30 text-slate-400' : 'bg-slate-100 text-slate-500')
+                ? (theme === 'dark' ? 'bg-brand-500/10 text-brand-400' : 'bg-brand-50 text-brand-600')
+                : (theme === 'dark' ? 'bg-slate-700/30 text-slate-400' : 'bg-slate-100 text-slate-500')
                 } ${theme === 'dark' ? 'group-hover:bg-slate-700' : 'group-hover:bg-slate-200'}`}>
                 <action.icon size={18} />
               </div>

@@ -308,8 +308,11 @@ const CreativeHub: React.FC<CreativeHubProps> = ({ token, accountIds, datePreset
     // Responsive Zoom Default
     useEffect(() => {
         const handleResize = () => {
-            if (window.innerWidth < 768) setZoomLevel(1); // Mobile: 1 Col
-            else setZoomLevel(4); // Desktop: Default
+            const w = window.innerWidth;
+            if (w < 768) setZoomLevel(1);      // Mobile
+            else if (w < 1024) setZoomLevel(2); // Tablet / Small Laptop
+            else if (w < 1440) setZoomLevel(3); // Normal Laptop
+            else setZoomLevel(4);              // Large Screen
         };
         handleResize(); // Run on mount
         window.addEventListener('resize', handleResize);
@@ -322,7 +325,8 @@ const CreativeHub: React.FC<CreativeHubProps> = ({ token, accountIds, datePreset
 
     useEffect(() => {
         const load = async (isBackground = false) => {
-            if (!isBackground) setLoading(true);
+            // Stale-While-Revalidate: Only show spinner if we have NO data
+            if (ads.length === 0 && !isBackground) setLoading(true);
             try {
                 const data = await fetchCreativePerformance(accountIds, token, datePreset, filter);
                 setAds(data);
@@ -489,61 +493,90 @@ const CreativeHub: React.FC<CreativeHubProps> = ({ token, accountIds, datePreset
 
     return (
         <div className="space-y-6 relative pb-12 w-full">
-            <div className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 rounded-xl border backdrop-blur-md sticky top-0 z-50 transition-colors shadow-sm w-full ${stickyHeaderBg}`}>
-                <div>
-                    <div className="flex items-center gap-3">
-                        <h2 className={`text-lg md:text-2xl font-bold flex items-center ${headingColor}`}>
-                            Ads Hub
-                            <span className={`ml-3 px-2 py-0.5 rounded text-[10px] uppercase tracking-wide border ${isDark ? 'bg-brand-500/20 text-brand-300 border-brand-500/30' : 'bg-brand-50 text-brand-700 border-brand-200'}`}>
-                                {ads.length} Assets
-                            </span>
-                        </h2>
-                        {/* Zoom Controls (Play Mode) */}
-                        <div className={`hidden md:flex items-center gap-1 p-0.5 rounded-lg border ml-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
-                            <button onClick={() => setZoomLevel(Math.min(zoomLevel + 1, 6))} className="p-1 hover:bg-white dark:hover:bg-slate-600 rounded transition-all active:scale-90 text-slate-500 hover:text-brand-500" title="Decrease Columns (Larger)"><ZoomOut size={14} /></button>
-                            <button onClick={() => setZoomLevel(Math.max(zoomLevel - 1, 1))} className="p-1 hover:bg-white dark:hover:bg-slate-600 rounded transition-all active:scale-90 text-slate-500 hover:text-brand-500" title="Increase Columns (Smaller)"><ZoomIn size={14} /></button>
+            <div className={`flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 p-4 md:p-5 rounded-2xl border backdrop-blur-xl sticky top-0 z-50 transition-all shadow-sm ${stickyHeaderBg}`}>
+                <div className="flex flex-col md:flex-row md:items-center justify-between lg:justify-start gap-4 flex-1 min-w-0">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                            <h2 className={`text-lg md:text-2xl font-black tracking-tight flex items-center ${headingColor}`}>
+                                Ads Hub
+                                <span className={`ml-3 px-2 py-0.5 rounded-md text-[10px] md:text-xs font-bold uppercase tracking-wide border shadow-sm ${isDark ? 'bg-brand-500/10 text-brand-300 border-brand-500/20' : 'bg-brand-50 text-brand-700 border-brand-200'}`}>
+                                    {ads.length} Assets
+                                </span>
+                            </h2>
+                            {/* Zoom Controls - Integrated near title for better UX */}
+                            <div className={`hidden xl:flex items-center gap-0.5 p-0.5 rounded-lg border ml-2 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
+                                <button onClick={() => setZoomLevel(Math.min(zoomLevel + 1, 6))} className="p-1.5 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-all active:scale-95 text-slate-500 hover:text-brand-500" title="Smaller Cards (More Columns)"><ZoomOut size={14} /></button>
+                                <button onClick={() => setZoomLevel(Math.max(zoomLevel - 1, 1))} className="p-1.5 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-all active:scale-95 text-slate-500 hover:text-brand-500" title="Larger Cards (Fewer Columns)"><ZoomIn size={14} /></button>
+                            </div>
+                        </div>
+                        <p className={`text-xs md:text-sm font-medium truncate ${subHeadingColor} hidden sm:block`}>AI-powered visual performance audit & creative analysis</p>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between md:justify-end gap-2 sm:gap-3 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0 no-scrollbar">
+                    {/* Sort & Metrics Group */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <div className="relative" ref={sortPanelRef}>
+                            <button onClick={() => { setShowSortPanel(!showSortPanel); setShowMetricsPanel(false); }} className={`group flex items-center space-x-2 px-3 py-2 md:py-2.5 rounded-xl border text-xs md:text-sm font-bold transition-all active:scale-95 ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600 hover:text-white' : 'bg-white border-slate-200 hover:border-brand-300 hover:text-brand-600 shadow-sm'}`}>
+                                {sortConfig.direction === 'asc' ? <SortAsc size={16} className="text-brand-500" /> : <SortDesc size={16} className="text-brand-500" />}
+                                <span className="hidden sm:inline">Sort</span>
+                            </button>
+                            {/* Sort Dropdown (Kept existing logic) */}
+                            {showSortPanel && <div className={`absolute right-0 md:right-0 mt-2 p-2 rounded-xl shadow-2xl border z-[60] w-56 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                    {AVAILABLE_METRICS.map(m => {
+                                        if (userConfig?.hide_total_spend && COST_METRICS.includes(m.id)) return null;
+                                        const isActive = sortConfig.key === m.id;
+                                        return (
+                                            <button
+                                                key={m.id}
+                                                onClick={() => { handleSort(m.id); setShowSortPanel(false) }}
+                                                className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${isActive ? (isDark ? 'bg-brand-900/20 text-brand-300' : 'bg-brand-50 text-brand-700') : ''}`}
+                                            >
+                                                <span className="font-medium">{m.label}</span>
+                                                {isActive && (
+                                                    <div className="flex items-center">
+                                                        {sortConfig.direction === 'asc' ? <ArrowUp size={12} className="mr-2" /> : <ArrowDown size={12} className="mr-2" />}
+                                                        <Check size={12} />
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>}
+                        </div>
+
+                        <div className="relative" ref={metricsPanelRef}>
+                            <button onClick={() => { setShowMetricsPanel(!showMetricsPanel); setShowSortPanel(false); }} className={`group flex items-center space-x-2 px-3 py-2 md:py-2.5 rounded-xl border text-xs md:text-sm font-bold transition-all active:scale-95 ${isDark ? 'bg-slate-800 border-slate-700 hover:border-slate-600 hover:text-white' : 'bg-white border-slate-200 hover:border-brand-300 hover:text-brand-600 shadow-sm'}`}>
+                                <SlidersHorizontal size={16} className="text-brand-500" />
+                                <span>Metrics</span>
+                            </button>
+                            {/* Metrics Dropdown */}
+                            {showMetricsPanel && <div className={`absolute right-0 mt-2 p-4 rounded-xl shadow-2xl border z-[60] w-[85vw] max-w-sm md:w-96 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                <div className="flex justify-between items-center mb-3 pb-2 border-b dark:border-slate-800">
+                                    <h4 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Visible Metrics</h4>
+                                    <button onClick={() => setShowMetricsPanel(false)}><X size={14} /></button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                    {AVAILABLE_METRICS.map(m => (
+                                        <label key={m.id} className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${selectedMetrics.has(m.id) ? (isDark ? 'bg-brand-900/20 text-brand-300' : 'bg-brand-50 text-brand-700') : (isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50')}`}>
+                                            <input type="checkbox" checked={selectedMetrics.has(m.id)} onChange={() => toggleMetric(m.id)} className="mr-3 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                                            <span className="text-xs font-medium">{m.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>}
                         </div>
                     </div>
-                    <p className={`text-xs md:text-sm mt-1 ${subHeadingColor}`}>AI-powered visual performance audit</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative" ref={sortPanelRef}>
-                        <button onClick={() => { setShowSortPanel(!showSortPanel); setShowMetricsPanel(false); }} className={`flex items-center space-x-2 px-3 py-2 rounded-lg border text-xs md:text-sm transition-colors ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200'}`}>{sortConfig.direction === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />} <span className="hidden sm:inline">Sort By</span></button>
-                        {showSortPanel && <div className={`absolute md:right-0 mt-2 p-2 rounded-xl shadow-2xl border z-[60] w-56 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-                            <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                                {AVAILABLE_METRICS.map(m => {
-                                    if (userConfig?.hide_total_spend && COST_METRICS.includes(m.id)) return null;
-                                    const isActive = sortConfig.key === m.id;
-                                    return (
-                                        <button
-                                            key={m.id}
-                                            onClick={() => { handleSort(m.id); setShowSortPanel(false) }}
-                                            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-800 ${isActive ? (isDark ? 'bg-brand-900/20 text-brand-300' : 'bg-brand-50 text-brand-700') : ''}`}
-                                        >
-                                            <span>{m.label}</span>
-                                            {isActive && (
-                                                <div className="flex items-center">
-                                                    {sortConfig.direction === 'asc' ? <ArrowUp size={12} className="mr-2" /> : <ArrowDown size={12} className="mr-2" />}
-                                                    <Check size={12} />
-                                                </div>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>}
-                    </div>
-                    <div className="relative" ref={metricsPanelRef}>
-                        <button onClick={() => { setShowMetricsPanel(!showMetricsPanel); setShowSortPanel(false); }} className={`flex items-center space-x-2 px-3 py-2 rounded-lg border text-xs md:text-sm ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}><SlidersHorizontal size={14} /> <span>Metrics</span></button>
-                        {showMetricsPanel && <div className={`absolute md:right-0 mt-2 p-4 rounded-xl shadow-2xl border z-[60] w-72 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-                            <div className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto custom-scrollbar">{AVAILABLE_METRICS.map(m => <label key={m.id} className="flex items-center p-2"><input type="checkbox" checked={selectedMetrics.has(m.id)} onChange={() => toggleMetric(m.id)} className="mr-2" /> <span className="text-xs">{m.label}</span></label>)}</div>
-                        </div>}
-                    </div>
-                    <div className={`hidden md:flex items-center space-x-1 p-1 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
-                        <button onClick={handleResetLayout} className="p-2 rounded-md text-slate-500 hover:text-brand-500 hover:bg-white dark:hover:bg-slate-700 transition-colors" title="Reset Column Layout"><RotateCcw size={16} /></button>
-                        <div className={`w-[1px] h-4 mx-1 ${isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
-                        <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-brand-600 text-white' : ''}`}><LayoutGrid size={16} /></button>
-                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-brand-600 text-white' : ''}`}><List size={16} /></button>
+
+                    {/* Divider */}
+                    <div className={`w-[1px] h-8 mx-1 hidden sm:block ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`} />
+
+                    {/* Layout Controls */}
+                    <div className={`flex items-center p-1 rounded-xl border shrink-0 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
+                        <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 text-brand-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`} title="Grid View"><LayoutGrid size={18} /></button>
+                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 text-brand-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`} title="List View"><List size={18} /></button>
                     </div>
                 </div>
             </div>

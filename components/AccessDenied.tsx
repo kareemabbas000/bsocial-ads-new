@@ -198,7 +198,7 @@ const AccessDenied: React.FC<AccessDeniedProps> = ({ theme, onContactSupport, on
                         <span className={`text-[10px] md:text-xs items-center font-bold tracking-widest opacity-60 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>POWERED BY</span>
                         <div className="flex items-center gap-2 md:gap-2.5 opacity-100 transition-all duration-500">
                             <img
-                                src="https://vslsjgfhwknxjhtxlhhk.supabase.co/storage/v1/object/public/logos/Logo%20Bsocial%20Icon%20new.png"
+                                src="https://icgkbruoltgvchbqednf.supabase.co/storage/v1/object/public/logos/Logo%20Bsocial%20Icon%20new.png"
                                 alt="BSocial Logo"
                                 className="w-5 h-5 md:w-6 md:h-6 object-contain drop-shadow-sm"
                             />

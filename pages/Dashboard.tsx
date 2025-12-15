@@ -5,7 +5,7 @@ import {
     LineChart, Line, AreaChart, Area, Cell, Legend, ComposedChart, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Label,
     ScatterChart, Scatter, ZAxis, ReferenceLine
 } from 'recharts';
-import { Sparkles, Users, Globe, Monitor, Zap, Clock, Smartphone, Filter, Briefcase, MessageCircle, Heart, DollarSign, ChevronDown, Target, Instagram, Facebook, Share2, ArrowRight, TrendingUp, TrendingDown, Info, Trophy } from 'lucide-react';
+import { Sparkles, Users, Globe, Monitor, Zap, Clock, Smartphone, Filter, Briefcase, MessageCircle, Heart, DollarSign, ChevronDown, Target, Instagram, Facebook, Share2, ArrowRight, TrendingUp, TrendingDown, Info, Trophy, Eye, MousePointer, ShoppingBag, Circle, RefreshCw } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import LoadingSpinner from '../components/LoadingSpinner'; // Unified Loading
 import {
@@ -15,10 +15,12 @@ import {
     fetchDailyAccountInsights,
     fetchHourlyInsights,
     fetchPlacementBreakdown,
-    getPreviousPeriod
+    getPreviousPeriod,
+    fetchAdSetsWithInsights,
+    fetchAdsWithInsights
 } from '../services/metaService';
-import { analyzeCampaignPerformance } from '../services/aiService';
-import { Campaign, InsightData, DateSelection, DailyInsight, HourlyInsight, Theme, GlobalFilter, UserConfig } from '../types';
+import { analyzeCampaignPerformance, generatePerformanceAudit } from '../services/aiService';
+import { Campaign, InsightData, DateSelection, DailyInsight, HourlyInsight, Theme, GlobalFilter, UserConfig, AdSet, Ad } from '../types';
 
 interface DashboardProps {
     token: string;
@@ -42,84 +44,9 @@ const COLORS = {
     slate: '#64748b'
 };
 
-const PROFILE_CONFIG = {
-    sales: {
-        label: 'Sales Kit',
-        icon: DollarSign,
-        cards: [
-            { id: 'spend', label: 'Total Spend', format: 'currency', color: '#0055ff' },
-            { id: 'roas', label: 'Return on Ad Spend', format: 'number', suffix: 'x', color: '#10b981' },
-            { id: 'cpa', label: 'Cost Per Acquisition', format: 'currency', color: '#ec4899', reverseColor: true },
-            { id: 'ctr', label: 'Click Through Rate', format: 'percent', color: '#f59e0b' }
-        ],
-        mainChart: {
-            bar: { key: 'spend', color: '#0055ff', name: 'Spend', axisLabel: 'SPEND ($)' },
-            line: { key: 'roas', color: '#10b981', name: 'ROAS', axisLabel: 'ROAS (x)' },
-            title: 'Spend vs. ROAS Trend'
-        },
-        secondary1: { key: 'ctr', color: '#f59e0b', title: 'CTR Performance', axisLabel: 'CTR (%)' },
-        secondary2: { key: 'clicks', color: '#8b5cf6', title: 'Daily Volume (Clicks)', axisLabel: 'CLICKS' },
-        funnel: ['Impressions', 'Clicks', 'Link Clicks', 'Purchases'],
-        breakdownMetric: 'spend'
-    },
-    engagement: {
-        label: 'Engagement',
-        icon: Heart,
-        cards: [
-            { id: 'spend', label: 'Total Spend', format: 'currency', color: '#64748b' },
-            { id: 'reach', label: 'Reach', format: 'number', color: '#0055ff' },
-            { id: 'impressions', label: 'Impressions', format: 'number', color: '#8b5cf6' },
-            { id: 'post_engagement', label: 'Post Engagements', format: 'number', color: '#ec4899' }
-        ],
-        mainChart: {
-            bar: { key: 'reach', color: '#0055ff', name: 'Reach', axisLabel: 'REACH' },
-            line: { key: 'impressions', color: '#8b5cf6', name: 'Impressions', axisLabel: 'IMPRESSIONS' },
-            title: 'Reach vs. Impressions Trend'
-        },
-        secondary1: { key: 'engagement_rate', color: '#ec4899', title: 'Engagement Rate', axisLabel: 'ENG. RATE (%)' },
-        secondary2: { key: 'post_engagement', color: '#8b5cf6', title: 'Post Engagements', axisLabel: 'ENGAGEMENTS' },
-        funnel: ['Reach', 'Impressions', 'Clicks', 'Post Engagements'],
-        breakdownMetric: 'impressions'
-    },
-    leads: {
-        label: 'Leads Gen',
-        icon: Briefcase,
-        cards: [
-            { id: 'spend', label: 'Total Spend', format: 'currency', color: '#64748b' },
-            { id: 'reach', label: 'Reach', format: 'number', color: '#0055ff' },
-            { id: 'impressions', label: 'Impressions', format: 'number', color: '#8b5cf6' },
-            { id: 'leads', label: 'Leads', format: 'number', color: '#10b981' }
-        ],
-        mainChart: {
-            bar: { key: 'reach', color: '#0055ff', name: 'Reach', axisLabel: 'REACH' },
-            line: { key: 'impressions', color: '#8b5cf6', name: 'Impressions', axisLabel: 'IMPRESSIONS' },
-            title: 'Reach vs. Impressions Trend'
-        },
-        secondary1: { key: 'ctr', color: '#f59e0b', title: 'CTR Performance', axisLabel: 'CTR (%)' },
-        secondary2: { key: 'leads', color: '#10b981', title: 'Lead Volume', axisLabel: 'LEADS' },
-        funnel: ['Reach', 'Impressions', 'Clicks', 'Leads'],
-        breakdownMetric: 'impressions'
-    },
-    messenger: {
-        label: 'Messenger',
-        icon: MessageCircle,
-        cards: [
-            { id: 'spend', label: 'Total Spend', format: 'currency', color: '#64748b' },
-            { id: 'reach', label: 'Reach', format: 'number', color: '#0055ff' },
-            { id: 'impressions', label: 'Impressions', format: 'number', color: '#8b5cf6' },
-            { id: 'messaging_conversations', label: 'Conversations', format: 'number', color: '#0055ff' }
-        ],
-        mainChart: {
-            bar: { key: 'reach', color: '#0055ff', name: 'Reach', axisLabel: 'REACH' },
-            line: { key: 'impressions', color: '#8b5cf6', name: 'Impressions', axisLabel: 'IMPRESSIONS' },
-            title: 'Reach vs. Impressions Trend'
-        },
-        secondary1: { key: 'ctr', color: '#f59e0b', title: 'CTR Performance', axisLabel: 'CTR (%)' },
-        secondary2: { key: 'messaging_conversations', color: '#0055ff', title: 'Conversations Started', axisLabel: 'MSGS' },
-        funnel: ['Reach', 'Impressions', 'Clicks', 'Conversations'],
-        breakdownMetric: 'impressions'
-    }
-};
+import { PROFILE_CONFIG } from '../constants/profileConfig';
+
+// ... (getHeatmapColor function remains)
 
 const getHeatmapColor = (val: number, max: number, metric: string) => {
     if (max === 0 || val === 0) return 'bg-slate-50 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600';
@@ -183,8 +110,27 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     // AI State
     const [analyzing, setAnalyzing] = useState(false);
     const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+    const [loadingText, setLoadingText] = useState('Initializing AI Core...'); // New Loading State
     const [showAllPlacements, setShowAllPlacements] = useState(false); // Mobile UX: Show all placements
     const aiAuditRef = useRef<HTMLDivElement>(null); // Mobile UX: Scroll target
+
+    // Cycle Loading Text
+    useEffect(() => {
+        if (!analyzing) return;
+        const texts = [
+            "Scanning Account Hierarchy...",
+            "Analyzing Bid Strategies...",
+            "Checking Creative Performance...",
+            "Detecting Audience Saturation...",
+            "Formulating Optimization Plan..."
+        ];
+        let i = 0;
+        const interval = setInterval(() => {
+            i = (i + 1) % texts.length;
+            setLoadingText(texts[i]);
+        }, 1500);
+        return () => clearInterval(interval);
+    }, [analyzing]);
 
     const [activeTab, setActiveTab] = useState<'overview' | 'audience' | 'platform' | 'time'>('overview');
 
@@ -193,16 +139,18 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     const isDark = theme === 'dark';
 
     const styles = {
-        cardBg: isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]',
-        heading: isDark ? 'text-white' : 'text-slate-900',
+        cardBg: isDark
+            ? 'bg-slate-900/50 border-slate-800'
+            : 'bg-white border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-shadow duration-500', // Enhanced Light Mode Shadow
+        heading: isDark ? 'text-white' : 'text-slate-800',
         textSub: isDark ? 'text-slate-400' : 'text-slate-500',
         chartGrid: isDark ? '#1e293b' : '#f1f5f9',
         chartAxis: isDark ? '#64748b' : '#94a3b8',
         tooltipBg: isDark ? '#0f172a' : '#ffffff',
         tooltipBorder: isDark ? '#334155' : '#e2e8f0',
         tooltipText: isDark ? '#fff' : '#1e293b',
-        tabActive: 'text-brand-500 border-brand-500',
-        tabInactive: isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-800'
+        tabActive: 'text-brand-600 border-brand-600',
+        tabInactive: isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700'
     };
 
     const formatCompact = (val: number, key?: string) => {
@@ -266,6 +214,15 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
             return purchaseValue / spend;
         }
 
+        if (key === 'purchases') {
+            const acts = source.actions || [];
+            let act = acts.find((a: any) => a.action_type === 'omni_purchase');
+            if (!act) act = acts.find((a: any) => a.action_type === 'purchase');
+            if (!act) act = acts.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase');
+            if (!act) act = acts.find((a: any) => a.action_type.toLowerCase().includes('purchase'));
+            return parseInt(act?.value || '0');
+        }
+
         if (key === 'post_engagement' || key === 'leads' || key === 'messaging_conversations') {
             const mapping = {
                 'post_engagement': 'post_engagement',
@@ -286,8 +243,9 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     };
 
     const loadData = async (isBackgroundRefresh = false) => {
-        // Only show full spinner on initial load to avoid dark flicker on refresh
-        if (!isBackgroundRefresh) setLoading(true);
+        // Soft Loading: Only show full spinner on initial load. 
+        // If we already have data, keep it visible during update (Stale-While-Revalidate).
+        if (!accountData && !isBackgroundRefresh) setLoading(true);
 
         try {
             const appliedFilter = {
@@ -393,6 +351,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
 
         let purchaseAction = accountData.actions?.find((a: any) => a.action_type === 'omni_purchase');
         if (!purchaseAction) purchaseAction = accountData.actions?.find((a: any) => a.action_type === 'purchase');
+        if (!purchaseAction) purchaseAction = accountData.actions?.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase');
 
         const metrics = {
             'Reach': parseInt(accountData.reach || '0'),
@@ -433,23 +392,26 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
 
     const processedRegions = useMemo(() => {
         const metricKey = activeConfig.breakdownMetric;
-        return regionData.slice(0, 10).map(d => {
-            const val = parseFloat(d?.[metricKey] || '0') * (metricKey === 'spend' ? multiplier : 1);
-            // const spend = parseFloat(d.spend || '1') * multiplier; // ROAS no longer needed
-            // const reach = parseInt(d.reach || '0');
-            // const impressions = parseInt(d.impressions || '0');
-            const clicks = parseInt(d.clicks || '0');
+        return regionData
+            .map(d => {
+                const val = parseFloat(d?.[metricKey] || '0') * (metricKey === 'spend' ? multiplier : 1);
+                // const spend = parseFloat(d.spend || '1') * multiplier; // ROAS no longer needed
+                // const reach = parseInt(d.reach || '0');
+                // const impressions = parseInt(d.impressions || '0');
+                const clicks = parseInt(d.clicks || '0');
 
-            // Defined by User Request: Top Regions by Spend (Primary) vs Clicks (Secondary)
-            // Primary is typically spend for this chart header "Top Regions by Spend"
-            // Secondary replaces ROAS with Clicks
+                // Defined by User Request: Top Regions by Spend (Primary) vs Clicks (Secondary)
+                // Primary is typically spend for this chart header "Top Regions by Spend"
+                // Secondary replaces ROAS with Clicks
 
-            return {
-                name: d.region || 'Unknown',
-                value: val, // Keep primary as Spend (or whatever breakdownMetric is, usually spend)
-                secondaryValue: clicks
-            }
-        }).sort((a, b) => b.value - a.value);
+                return {
+                    name: d.region || 'Unknown',
+                    value: val, // Keep primary as Spend (or whatever breakdownMetric is, usually spend)
+                    secondaryValue: clicks
+                }
+            })
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 10);
     }, [regionData, profile, multiplier, activeConfig.breakdownMetric]);
 
     const processedPlacements = useMemo(() => {
@@ -465,6 +427,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                 const actionValues = d.action_values || [];
                 let purchaseVal = actionValues.find((v: any) => v.action_type === 'omni_purchase')?.value;
                 if (!purchaseVal) purchaseVal = actionValues.find((v: any) => v.action_type === 'purchase')?.value;
+                if (!purchaseVal) purchaseVal = actionValues.find((v: any) => v.action_type === 'offsite_conversion.fb_pixel_purchase')?.value;
                 const roas = spend > 0 ? (parseFloat(purchaseVal || '0') / spend) : 0;
 
                 let efficiency = 0;
@@ -523,16 +486,42 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     }, [placementData, profile, multiplier]);
 
     const handleRunAI = async () => {
-        // Mobile UX: Auto-scroll to AI Audit section if layout is stacked (lg breakpoint is 1024px)
+        // Mobile UX: Auto-scroll to AI Audit section if layout is stacked
         if (window.innerWidth < 1024 && aiAuditRef.current) {
             aiAuditRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         if (campaigns.length === 0) return;
         setAnalyzing(true);
-        const result = await analyzeCampaignPerformance(campaigns);
-        setAiAnalysis(result.analysis);
-        setAnalyzing(false);
+        setLoadingText("Initializing Deep Audit...");
+
+        try {
+            // Fetch comprehensive data for the audit
+            const [adSets, ads] = await Promise.all([
+                fetchAdSetsWithInsights(accountIds, token, datePreset, filter),
+                fetchAdsWithInsights(accountIds, token, datePreset, filter)
+            ]);
+
+            const result = await generatePerformanceAudit(
+                accountData,
+                campaigns,
+                adSets.data,
+                ads.data,
+                {
+                    placements: placementData,
+                    demographics: ageGenderData,
+                    regions: regionData
+                },
+                profile,
+                datePreset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) // "last_30d" -> "Last 30d"
+            );
+            setAiAnalysis(result.analysis);
+        } catch (e) {
+            console.error("AI Audit Error", e);
+            setAiAnalysis("**Error:** Failed to generate full audit. Please try again.");
+        } finally {
+            setAnalyzing(false);
+        }
     };
 
     const formatDateAxis = (dateStr: string) => {
@@ -599,7 +588,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                         </p>
                     </div>
                 </div>
-            </div>
+            </div >
         );
     }
 
@@ -618,30 +607,65 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     };
 
     const RichTextRenderer = ({ content }: { content: string }) => {
-        const lines = content.split('\n');
+        // Split by main sections (headers starting with #)
+        const sections = content.split(/(?=^# )/gm).filter(s => s.trim().length > 0);
+
         return (
-            <div className="space-y-3">
-                {lines.map((line, idx) => {
-                    const trimmed = line.trim();
-                    if (!trimmed) return <div key={idx} className="h-1"></div>;
-                    if (trimmed.startsWith('#')) {
-                        const clean = trimmed.replace(/^#+\s/, '');
-                        return <h5 key={idx} className={`font-bold text-md mt-3 mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{parseBold(clean, isDark)}</h5>;
+            <div className="space-y-6 pb-8">
+                {sections.map((section, idx) => {
+                    const lines = section.split('\n');
+                    const title = lines[0].replace(/^#+\s*/, '').trim();
+                    const body = lines.slice(1).filter(l => l.trim().length > 0);
+
+                    // Determine Card Style based on Title keywords
+                    let cardStyle = isDark ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-100 shadow-sm';
+                    let titleColor = isDark ? 'text-blue-100' : 'text-slate-800';
+                    let icon = <Info size={18} className="text-blue-500" />;
+
+                    if (title.includes('Scale') || title.includes('Rocket')) {
+                        cardStyle = isDark ? 'bg-emerald-900/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100';
+                        titleColor = isDark ? 'text-emerald-300' : 'text-emerald-800';
+                        icon = <TrendingUp size={18} className="text-emerald-500" />;
+                    } else if (title.includes('Stop') || title.includes('Kill')) {
+                        cardStyle = isDark ? 'bg-rose-900/10 border-rose-500/20' : 'bg-rose-50 border-rose-100';
+                        titleColor = isDark ? 'text-rose-300' : 'text-rose-800';
+                        icon = <Zap size={18} className="text-rose-500" />;
+                    } else if (title.includes('Tactical') || title.includes('Optimization')) {
+                        cardStyle = isDark ? 'bg-purple-900/10 border-purple-500/20' : 'bg-purple-50 border-purple-100';
+                        titleColor = isDark ? 'text-purple-300' : 'text-purple-800';
+                        icon = <Target size={18} className="text-purple-500" />;
                     }
-                    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-                        return (
-                            <div key={idx} className="flex items-start gap-2 ml-1">
-                                <div className={`mt-2 w-1.5 h-1.5 rounded-full shrink-0 ${isDark ? 'bg-slate-500' : 'bg-slate-400'}`}></div>
-                                <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                                    {parseBold(trimmed.substring(2), isDark)}
-                                </p>
-                            </div>
-                        );
-                    }
+
                     return (
-                        <p key={idx} className={`text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                            {parseBold(trimmed, isDark)}
-                        </p>
+                        <div key={idx} className={`p-5 rounded-2xl border ${cardStyle} backdrop-blur-sm transition-all hover:shadow-md animate-fade-in-up`} style={{ animationDelay: `${idx * 100}ms` }}>
+                            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-black/5 dark:border-white/5">
+                                <div className={`p-2 rounded-lg ${isDark ? 'bg-black/20' : 'bg-white shadow-sm'}`}>
+                                    {icon}
+                                </div>
+                                <h3 className={`font-bold text-base ${titleColor}`}>{parseBold(title, isDark)}</h3>
+                            </div>
+
+                            <div className="space-y-3">
+                                {body.map((line, lineIdx) => {
+                                    const trimmed = line.trim();
+                                    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                                        return (
+                                            <div key={lineIdx} className="flex items-start gap-3">
+                                                <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${isDark ? 'bg-slate-500' : 'bg-slate-400'}`}></div>
+                                                <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                                                    {parseBold(trimmed.substring(2), isDark)}
+                                                </p>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <p key={lineIdx} className={`text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                                            {parseBold(trimmed, isDark)}
+                                        </p>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     );
                 })}
             </div>
@@ -754,7 +778,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                         }
                     } else {
                         displayValue = value.toLocaleString(undefined, {
-                            minimumFractionDigits: card.format === 'currency' ? 2 : 0,
+                            minimumFractionDigits: (card.format === 'currency' || card.format === 'x') ? 2 : 0,
                             maximumFractionDigits: card.format === 'currency' ? 2 : 2
                         });
                     }
@@ -765,7 +789,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                             label={card.label}
                             value={displayValue}
                             prefix={card.format === 'currency' ? '$' : ''}
-                            suffix={card.format === 'percent' ? '%' : (card.suffix || '')}
+                            suffix={card.format === 'percent' ? '%' : card.format === 'x' ? 'x' : (card.suffix || '')}
                             trend={trend}
                             sparklineData={dailyData}
                             dataKey={card.id}
@@ -797,7 +821,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                         <span>{tab.label}</span>
                     </button>
                 ))}
-            </div>
+            </div >
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column: Charts */}
@@ -947,71 +971,140 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                     Conversion Funnel Velocity
                                 </h3>
 
+                                {/* Creative Holographic Grid Design */}
                                 <div className="relative w-full py-4 z-10">
-                                    <div className="flex flex-col md:flex-row justify-between items-stretch gap-4 md:gap-0">
+                                    <div className={`grid grid-cols-1 md:grid-cols-2 ${processedFunnelData.length === 3 ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} gap-4 xl:gap-6`}>
                                         {processedFunnelData.map((step, idx) => {
                                             const isLast = idx === processedFunnelData.length - 1;
-                                            const nextStep = !isLast ? processedFunnelData[idx + 1] : null;
-                                            const convRate = nextStep && step.value > 0 ? ((nextStep.value / step.value) * 100).toFixed(1) + '%' : null;
+                                            const isFirst = idx === 0;
+                                            const prevStep = idx > 0 ? processedFunnelData[idx - 1] : null;
+                                            // Conversion rate from previous step
+                                            const convRate = prevStep && prevStep.value > 0
+                                                ? ((step.value / prevStep.value) * 100).toFixed(1)
+                                                : null;
+
+                                            // Relatie progress for the ring (relative to first step)
+                                            const progress = (step.value / processedFunnelData[0].value) * 100;
+                                            const circleRadius = 28;
+                                            const circleCircumference = 2 * Math.PI * circleRadius;
+                                            const strokeDashoffset = circleCircumference - (progress / 100) * circleCircumference;
+
+                                            // Icon Mapping
+                                            let StepIcon = Circle;
+                                            if (step.name.includes('Impressions') || step.name.includes('Reach')) StepIcon = Eye;
+                                            else if (step.name.includes('Click')) StepIcon = MousePointer;
+                                            else if (step.name.includes('Lead') || step.name.includes('Engagement')) StepIcon = Users;
+                                            else if (step.name.includes('Purchase')) StepIcon = ShoppingBag;
+                                            else if (step.name.includes('Convers')) StepIcon = MessageCircle;
+
+                                            // Visual Rename for compactness
+                                            const displayName = step.name === 'Post Engagements' ? 'Engagements' : step.name;
 
                                             return (
-                                                <div key={idx} className="flex-1 flex flex-col items-center relative group min-w-0">
-                                                    <div className="flex items-center w-full">
-                                                        {/* Card */}
-                                                        <div className={`
-                                                    flex-1 w-full p-6 relative
-                                                    transition-all duration-300 transform group-hover:-translate-y-1
-                                                    ${idx === 0 ? 'rounded-l-2xl' : ''} ${isLast ? 'rounded-r-2xl' : ''}
-                                                    ${!isLast ? 'md:border-r border-dashed' : ''}
-                                                    ${isDark
-                                                                ? 'bg-gradient-to-b from-slate-800 to-slate-900/50 border-slate-700/50 hover:bg-slate-800'
-                                                                : 'bg-slate-50/80 hover:bg-white border-slate-200 shadow-sm'}
-                                                    border md:border-y md:border-l ${isLast ? 'md:border-r' : ''}
-                                                    rounded-xl md:rounded-none
-                                                `}>
-                                                            <div className="flex flex-col h-full justify-between items-center text-center">
-                                                                <div className={`mb-4 p-3 rounded-full group-hover:scale-110 transition-transform duration-300 ${isDark ? 'bg-slate-800' : 'bg-white shadow-sm border border-slate-100'}`}>
-                                                                    <div className="w-3 h-3 rounded-full shadow-inner" style={{ backgroundColor: step.fill, boxShadow: `0 0 10px ${step.fill}` }}></div>
-                                                                </div>
+                                                <div key={idx} className="group relative">
+                                                    {/* Ambient Glow Background */}
+                                                    <div
+                                                        className="absolute inset-0 rounded-3xl opacity-20 blur-xl transition-all duration-500 group-hover:opacity-40 group-hover:blur-2xl"
+                                                        style={{ backgroundColor: step.fill }}
+                                                    ></div>
 
-                                                                <div>
-                                                                    <div className={`text-xs uppercase font-extrabold tracking-widest mb-2 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-                                                                        {step.name}
-                                                                    </div>
-                                                                    <div className={`text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-br ${isDark ? 'from-white to-slate-400' : 'from-slate-900 to-slate-600'}`}>
-                                                                        {formatCompact(step.value)}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Conversion Pill - Positioned relative to flex flow, avoiding overlap */}
-                                                        {!isLast && (
-                                                            <div className="hidden md:flex flex-col items-center justify-center -ml-5 z-20 relative">
-                                                                <div className={`
-                                                            px-3 py-1.5 rounded-full text-[10px] font-bold shadow-xl border
-                                                            flex items-center space-x-1 whitespace-nowrap
-                                                            ${isDark ? 'bg-slate-950 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}
-                                                            group-hover:scale-110 transition-transform
-                                                        `}>
-                                                                    <span>{convRate}</span>
-                                                                    <ArrowRight size={10} className="text-emerald-500" />
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Mobile Down Arrow */}
-                                                    {!isLast && (
-                                                        <div className="md:hidden my-2 z-20">
-                                                            <div className={`
-                                                        px-3 py-1 rounded-full text-[10px] font-bold border shadow-sm
-                                                        ${isDark ? 'bg-slate-950 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}
+                                                    {/* Glass Card */}
+                                                    <div className={`
+                                                        relative h-full p-4 lg:p-6 rounded-3xl border backdrop-blur-sm overflow-hidden transition-all duration-300 transform group-hover:-translate-y-2
+                                                        ${isDark
+                                                            ? 'bg-gradient-to-br from-slate-900/90 to-slate-800/90 border-slate-700/50 shadow-2xl'
+                                                            : 'bg-gradient-to-br from-white/90 to-slate-50/90 border-white/50 shadow-xl shadow-brand-500/5'}
                                                     `}>
-                                                                {convRate} ↓
-                                                            </div>
+                                                        {/* Decorative Header Pattern */}
+                                                        <div className="absolute top-0 left-0 right-0 h-32 opacity-10 pointer-events-none">
+                                                            <svg width="100%" height="100%" preserveAspectRatio="none">
+                                                                <path d="M0 0 C 40 10 60 50 100 0 Z" fill={step.fill} transform="scale(3, 1)" />
+                                                                <circle cx="90%" cy="20%" r="40" fill={step.fill} filter="url(#blur)" />
+                                                            </svg>
                                                         </div>
-                                                    )}
+
+                                                        <div className="relative z-10 flex flex-col items-center text-center">
+
+                                                            {/* Iconic Circular Progress HUD */}
+                                                            <div className="relative mb-4 lg:mb-6">
+                                                                {/* Glowing Ring Container */}
+                                                                <div className="w-20 h-20 lg:w-24 lg:h-24 relative flex items-center justify-center">
+                                                                    {/* Track */}
+                                                                    <svg className="w-full h-full transform -rotate-90">
+                                                                        <circle
+                                                                            cx="50%" cy="50%" r={circleRadius}
+                                                                            fill="none"
+                                                                            stroke={isDark ? '#334155' : '#e2e8f0'}
+                                                                            strokeWidth="6"
+                                                                            className="opacity-30"
+                                                                        />
+                                                                        {/* Progress Indicator */}
+                                                                        <circle
+                                                                            cx="50%" cy="50%" r={circleRadius}
+                                                                            fill="none"
+                                                                            stroke={step.fill}
+                                                                            strokeWidth="6"
+                                                                            strokeLinecap="round"
+                                                                            strokeDasharray={circleCircumference}
+                                                                            strokeDashoffset={strokeDashoffset}
+                                                                            className="transition-all duration-1000 ease-out"
+                                                                            style={{ filter: `drop-shadow(0 0 4px ${step.fill})` }}
+                                                                        />
+                                                                    </svg>
+
+                                                                    {/* Center Icon */}
+                                                                    <div
+                                                                        className={`absolute inset-0 m-auto w-10 h-10 lg:w-12 lg:h-12 rounded-full flex items-center justify-center shadow-inner ${isDark ? 'bg-slate-800' : 'bg-white'}`}
+                                                                    >
+                                                                        <StepIcon size={20} style={{ color: step.fill }} strokeWidth={2.5} />
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Step Number Badge */}
+                                                                <div className={`
+                                                                    absolute -bottom-2 inset-x-0 mx-auto w-max px-2 py-0.5 rounded-full text-[8px] lg:text-[9px] font-black uppercase tracking-widest border shadow-sm
+                                                                    ${isDark ? 'bg-slate-950 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}
+                                                                `}>
+                                                                    Step 0{idx + 1}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Metrics */}
+                                                            <div className="mb-2">
+                                                                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                                    {displayName}
+                                                                </div>
+                                                                <div className={`text-2xl lg:text-3xl font-black tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                                                    {formatCompact(step.value)}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Velocity Badge (Flow Rate) */}
+                                                            {!isFirst ? (
+                                                                <div className={`
+                                                                    mt-4 md:mt-2 lg:mt-3 inline-flex flex-col xl:flex-row items-center justify-center space-y-1 md:space-y-0.5 xl:space-y-0 xl:space-x-2 px-4 py-2 md:px-1.5 md:py-1 rounded-xl md:rounded-lg border backdrop-blur-md w-full md:w-auto
+                                                                    ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white/60 border-slate-200'}
+                                                                `}>
+                                                                    <div className={`flex items-center space-x-1 ${Number(convRate) > 10 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                                        <TrendingUp size={14} className="md:w-[10px] md:h-[10px]" />
+                                                                        <span className="text-sm md:text-[11px] lg:text-xs font-bold">{convRate}%</span>
+                                                                    </div>
+                                                                    <span className={`text-[10px] md:text-[7px] lg:text-[8px] uppercase font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                                        Conversion
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                /* Show Entry Point for Step 1 */
+                                                                idx === 0 && (
+                                                                    <div className="mt-4 md:mt-2 lg:mt-3 h-auto md:h-7 flex items-center justify-center w-full md:w-auto">
+                                                                        <span className={`text-xs md:text-[10px] font-bold px-4 py-2 md:px-3 md:py-1 rounded-full w-full md:w-fit text-center mx-auto ${isDark ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
+                                                                            Entry Point
+                                                                        </span>
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
@@ -1023,7 +1116,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                             <div className={`${styles.cardBg} border rounded-xl p-6`}>
                                 <h3 className={`text-lg font-semibold ${styles.heading} mb-6 flex items-center`}>
                                     <Users className="mr-2 text-pink-500" size={18} />
-                                    Demographics (Spend by Age & Gender)
+                                    Demographics ({(profile === 'sales' && !hideTotalSpend) ? 'Spend' : 'Impressions'} by Age & Gender)
                                 </h3>
                                 <div className="h-72 w-full">
                                     <ResponsiveContainer width="100%" height="100%" debounce={50}>
@@ -1032,12 +1125,13 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                             <XAxis dataKey="age" stroke={styles.chartAxis} tick={{ fontSize: 12 }}>
                                                 <Label value="AGE GROUP" offset={-10} position="insideBottom" style={{ fontSize: '10px', fill: styles.chartAxis }} />
                                             </XAxis>
-                                            <YAxis stroke={styles.chartAxis} tickFormatter={(val) => formatCompact(val, activeConfig.breakdownMetric)} tick={{ fontSize: 11 }}>
-                                                <Label value={activeConfig.breakdownMetric === 'spend' ? 'SPEND' : 'IMPRESSIONS'} angle={-90} position="insideLeft" style={{ fontSize: '10px', fill: styles.chartAxis }} />
+                                            <YAxis stroke={styles.chartAxis} tickFormatter={(val) => formatCompact(val, (profile === 'sales' && !hideTotalSpend) ? 'currency' : 'number')} tick={{ fontSize: 11 }}>
+                                                <Label value={(profile === 'sales' && !hideTotalSpend) ? 'SPEND' : 'IMPRESSIONS'} angle={-90} position="insideLeft" style={{ fontSize: '10px', fill: styles.chartAxis }} />
                                             </YAxis>
                                             <Tooltip
-                                                contentStyle={{ backgroundColor: styles.tooltipBg, borderColor: styles.tooltipBorder, color: styles.tooltipText, borderRadius: '8px' }}
-                                                formatter={(val: number) => formatCompact(val, activeConfig.breakdownMetric === 'spend' ? 'currency' : 'number')}
+                                                cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', radius: 8 }}
+                                                contentStyle={{ backgroundColor: styles.tooltipBg, borderColor: styles.tooltipBorder, color: styles.tooltipText, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
+                                                formatter={(val: number) => formatCompact(val, (profile === 'sales' && !hideTotalSpend) ? 'currency' : 'number')}
                                             />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                             <Bar dataKey="Female" stackId="a" fill="#ec4899" radius={[0, 0, 0, 0]} barSize={50} />
@@ -1050,10 +1144,10 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                             <div className={`${styles.cardBg} border rounded-xl p-6`}>
                                 <h3 className={`text-lg font-semibold ${styles.heading} mb-6 flex items-center`}>
                                     <Globe className="mr-2 text-blue-500" size={18} />
-                                    Top Regions by Spend
+                                    Top Regions by {(profile === 'sales' && !hideTotalSpend) ? 'Spend' : 'Impressions'}
                                 </h3>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                    <div className="h-80 w-full">
+                                    <div className="min-h-[400px] h-full w-full">
                                         <ResponsiveContainer width="100%" height="100%" debounce={50}>
                                             <BarChart data={processedRegions} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                                                 <defs>
@@ -1065,7 +1159,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                                 <CartesianGrid strokeDasharray="3 3" stroke={styles.chartGrid} horizontal={false} />
                                                 <XAxis type="number" hide />
                                                 <YAxis type="category" dataKey="name" width={100} stroke={styles.chartAxis} style={{ fontSize: '11px' }} />
-                                                <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ backgroundColor: styles.tooltipBg, borderColor: styles.tooltipBorder, color: styles.tooltipText }} formatter={(val: number) => formatCompact(val, 'currency')} />
+                                                <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ backgroundColor: styles.tooltipBg, borderColor: styles.tooltipBorder, color: styles.tooltipText }} formatter={(val: number) => formatCompact(val, (profile === 'sales' && !hideTotalSpend) ? 'currency' : 'number')} />
                                                 <Bar dataKey="value" fill="url(#regionBarGradient)" radius={[0, 4, 4, 0]} barSize={20} />
                                             </BarChart>
                                         </ResponsiveContainer>
@@ -1075,7 +1169,8 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                             <thead className={`border-b ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'} text-xs font-bold uppercase`}>
                                                 <tr>
                                                     <th className="pb-3 pl-2">Region</th>
-                                                    <th className="pb-3 text-right">Spend</th>
+                                                    <th className="pb-3 text-center">{(profile === 'sales' && !hideTotalSpend) ? 'Spend' : 'Impressions'}</th>
+
                                                     <th className="pb-3 pl-4">Clicks</th>
                                                 </tr>
                                             </thead>
@@ -1087,9 +1182,10 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                                     return (
                                                         <tr key={i} className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}>
                                                             <td className={`py-3 pl-2 font-medium ${styles.heading} text-xs`}>{r.name}</td>
-                                                            <td className={`py-3 text-right ${styles.textSub} font-mono text-xs`}>
+                                                            <td className={`py-3 text-center ${styles.textSub} font-mono text-xs`}>
                                                                 {formatCompact(r.value, 'currency')}
                                                             </td>
+
                                                             <td className="py-3 pl-4">
                                                                 <div className="flex flex-col justify-center">
                                                                     <div className="flex justify-between items-end mb-1">
@@ -1218,7 +1314,20 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                     <h3 className={`font-bold ${styles.heading} flex items-center`}>
                                         <Zap size={18} className="mr-2 text-yellow-500" /> Performance Ledger
                                     </h3>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">Based on Efficiency & Volume</span>
+                                    <span className="hidden md:inline-block text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">Efficiency & Volume Analysis</span>
+                                </div>
+
+                                {/* User Education: Efficiency vs Volume */}
+                                <div className={`px-6 py-4 flex items-start gap-3 border-b ${isDark ? 'bg-blue-900/10 border-blue-900/30 text-blue-200' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
+                                    <Info size={16} className="shrink-0 mt-0.5 text-blue-500" />
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase tracking-widest opacity-70">How to read this data</p>
+                                        <p className="text-sm leading-relaxed opacity-90">
+                                            We rank placements by <strong>Volume ({profile === 'sales' ? 'Spend' : 'Impressions'})</strong> to show your biggest investments.
+                                            The <strong>Efficiency Score ({profile === 'sales' ? 'ROAS' : 'CTR/Eng'})</strong> confirms if that volume is profitable.
+                                            <span className="block mt-1 opacity-75 italic text-xs">Goal: High Volume + High Efficiency (Scale). Watch out for High Volume + Low Efficiency (Waste).</span>
+                                        </p>
+                                    </div>
                                 </div>
                                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {/* Load More Logic */}
@@ -1385,7 +1494,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                                 onClick={() => setHeatmapMetric(m)}
                                                 className={`px-3 py-1.5 rounded uppercase font-bold transition-all ${heatmapMetric === m
                                                     ? 'bg-brand-600 text-white shadow-md'
-                                                    : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800'
+                                                    : (isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800')
                                                     }`}
                                             >
                                                 {m}
@@ -1421,53 +1530,108 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
 
                 </div>
 
-                {/* Right Column: AI Analysis Panel */}
+                {/* Right Column: AI Analysis Panel - Redesigned Single Action */}
                 {!disableAi && (
                     <div className="lg:col-span-1" ref={aiAuditRef}>
-                        <div className={`sticky top-6 border rounded-xl p-0 h-[calc(100vh-12rem)] flex flex-col shadow-2xl overflow-hidden ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xl'}`}>
-                            <div className={`p-4 border-b flex items-center justify-between ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                                <div className="flex items-center space-x-2">
-                                    <Zap size={18} className="text-yellow-400" />
-                                    <h3 className={`font-bold ${styles.heading}`}>AI Audit</h3>
+                        <div className={`sticky top-24 rounded-2xl h-[calc(100vh-8rem)] flex flex-col overflow-hidden transition-all duration-500 group relative ${isDark
+                            ? 'bg-[#0B0E16]/80 backdrop-blur-3xl border border-blue-500/20 shadow-[0_0_50px_-10px_rgba(37,99,235,0.15)]'
+                            : 'bg-white/80 backdrop-blur-3xl border border-white/60 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]' // Enhanced Light Mode Shadow
+                            }`}>
+
+                            {/* Decorative Background Elements (Light Mode Boost) */}
+                            {!isDark && (
+                                <>
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-100/50 rounded-full blur-[80px] -z-10 pointer-events-none mix-blend-multiply"></div>
+                                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-100/50 rounded-full blur-[80px] -z-10 pointer-events-none mix-blend-multiply"></div>
+                                </>
+                            )}
+
+                            {/* Header */}
+                            <div className={`relative p-5 lg:p-6 border-b z-10 ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
+                                <div className="flex items-center justify-between relative z-10">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`relative flex items-center justify-center w-10 h-10 rounded-xl border ${isDark ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'}`}>
+                                            <Zap size={20} className={`text-blue-500 ${analyzing ? 'animate-pulse' : ''}`} />
+                                        </div>
+                                        <div>
+                                            <h3 className={`font-black text-sm lg:text-base tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>AI AUDIT CORE</h3>
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-blue-500 flex items-center gap-1.5 opacity-80">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                                {analyzing ? 'SYSTEM ACTIVE' : 'SYSTEM READY'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {aiAnalysis && !analyzing && (
+                                        <button
+                                            onClick={handleRunAI}
+                                            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 hover:text-blue-500"
+                                            title="Regenerate Audit"
+                                        >
+                                            <RefreshCw size={16} />
+                                        </button>
+                                    )}
                                 </div>
-                                {analyzing && <div className="text-xs text-slate-400 animate-pulse">Thinking...</div>}
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                            {/* Content Area */}
+                            <div className={`flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6 custom-scrollbar relative flex flex-col ${aiAnalysis || analyzing ? '' : 'justify-center'}`}>
                                 {!aiAnalysis && !analyzing ? (
-                                    <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-50">
-                                        <Zap size={48} className="text-slate-400" />
-                                        <p className="text-slate-400 text-sm px-8">Run an audit to see a comprehensive breakdown of your account health, wasted spend, and scaling wins.</p>
-                                        <button onClick={handleRunAI} className="px-4 py-2 bg-slate-800 rounded text-slate-300 text-sm hover:text-white">Start Audit</button>
+                                    <div className="flex flex-col items-center justify-center h-full text-center relative animate-fade-in-up">
+                                        {/* Modern AI Orb Animation */}
+                                        <div className="relative group cursor-pointer" onClick={handleRunAI} style={{ willChange: 'transform' }}>
+                                            {/* Reduced Blur Radius to prevent scrollbar overflow */}
+                                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 lg:w-40 lg:h-40 xl:w-48 xl:h-48 rounded-full blur-[40px] transition-transform duration-700 group-hover:blur-[60px] group-hover:scale-105 ${isDark ? 'bg-blue-600/20' : 'bg-blue-400/20'}`}></div>
+
+                                            <div className={`relative w-24 h-24 lg:w-28 lg:h-28 xl:w-32 xl:h-32 rounded-full border-2 flex items-center justify-center transition-transform duration-500 transform-gpu group-hover:scale-[1.02] ${isDark ? 'border-blue-500/30 bg-slate-900/50' : 'border-blue-200 bg-white/50 backdrop-blur-sm'}`}>
+                                                <Zap size={32} className={`text-blue-500 transition-transform duration-500 group-hover:scale-110 group-hover:drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] lg:w-10 lg:h-10 xl:w-12 xl:h-12`} />
+
+                                                {/* Orbiting Ring */}
+                                                <div className="absolute inset-0 rounded-full border border-blue-500/30 border-t-transparent animate-[spin_8s_linear_infinite]"></div>
+                                                <div className="absolute inset-2 rounded-full border border-purple-500/20 border-b-transparent animate-[spin_12s_linear_infinite_reverse]"></div>
+                                            </div>
+
+                                            {/* Pulse Waves - Controlled Size */}
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full rounded-full bg-blue-500/10 transition-all duration-700 group-hover:scale-110 group-hover:opacity-0 opacity-0"></div>
+                                        </div>
+
+                                        <h4 className={`text-xl lg:text-2xl font-black mb-3 mt-6 lg:mt-8 ${isDark ? 'text-white' : 'text-slate-900'}`}>Start Optimization Audit</h4>
+                                        <p className={`text-xs lg:text-sm max-w-[240px] lg:max-w-[280px] leading-relaxed mb-6 lg:mb-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                            Identify wasted spend and scaling opportunities with one click.
+                                        </p>
+
+                                        <button
+                                            onClick={handleRunAI}
+                                            className="relative px-6 py-2.5 lg:px-8 lg:py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-full shadow-[0_10px_40px_-10px_rgba(59,130,246,0.4)] transition-all hover:-translate-y-1 active:translate-y-0 text-xs lg:text-sm tracking-wide"
+                                        >
+                                            INITIALIZE SCAN
+                                        </button>
+                                    </div>
+                                ) : analyzing ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-center">
+                                        <div className="relative w-24 h-24 mb-8">
+                                            <div className="absolute inset-0 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                                            <div className="absolute inset-3 border-4 border-purple-500/20 border-b-purple-500 rounded-full animate-[spin_3s_linear_infinite_reverse]"></div>
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <Sparkles size={24} className="text-blue-400 animate-pulse" />
+                                            </div>
+                                        </div>
+                                        <div className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                                            {loadingText}
+                                        </div>
+                                        <div className={`text-xs uppercase tracking-widest ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                                            Processing Real-Time Data
+                                        </div>
                                     </div>
                                 ) : (
-                                    <div className="prose prose-sm max-w-none">
+                                    <div className={`pt-2`}>
                                         {aiAnalysis && <RichTextRenderer content={aiAnalysis} />}
                                     </div>
                                 )}
                             </div>
-
-                            <div className={`p-4 border-t ${isDark ? 'bg-slate-800/30 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                                <button
-                                    onClick={handleRunAI}
-                                    disabled={analyzing}
-                                    className="w-full py-3 bg-gradient-to-r from-brand-600 to-blue-600 hover:from-brand-500 hover:to-blue-500 text-white font-bold rounded-lg shadow-lg transition-all flex justify-center items-center space-x-2"
-                                >
-                                    {analyzing ? (
-                                        <>
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            <span>Auditing...</span>
-                                        </>
-                                    ) : (
-                                        <span>Generate Fresh Report</span>
-                                    )}
-                                </button>
-                            </div>
                         </div>
                     </div>
-                )}
-            </div>
-        </div >
+                )}</div>
+        </div>
     );
 };
 

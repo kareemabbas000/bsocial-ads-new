@@ -37,7 +37,10 @@ export const fetchSystemSetting = async (key: string): Promise<string | null> =>
     .eq('key', key)
     .single();
 
-  if (error) return null;
+  if (error) {
+    console.error("fetchSystemSetting Error:", error);
+    return null;
+  }
   return data.value;
 };
 

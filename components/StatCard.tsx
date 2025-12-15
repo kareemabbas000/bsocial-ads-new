@@ -17,12 +17,12 @@ interface StatCardProps {
   reverseColor?: boolean; // If true, negative trend is Good (Green), positive is Bad (Red). e.g., CPA
 }
 
-const StatCard: React.FC<StatCardProps> = ({ 
-  label, 
-  value, 
-  trend, 
-  prefix = '', 
-  suffix = '', 
+const StatCard: React.FC<StatCardProps> = ({
+  label,
+  value,
+  trend,
+  prefix = '',
+  suffix = '',
   sparklineData,
   dataKey = 'value',
   color = '#0055ff',
@@ -45,8 +45,8 @@ const StatCard: React.FC<StatCardProps> = ({
   return (
     <div className={`
       relative overflow-hidden rounded-xl border p-5 transition-all duration-300 group
-      ${theme === 'dark' 
-        ? 'bg-slate-900/50 border-slate-800 hover:border-slate-700 backdrop-blur-sm' 
+      ${theme === 'dark'
+        ? 'bg-slate-900/50 border-slate-800 hover:border-slate-700 backdrop-blur-sm'
         : 'bg-white border-slate-200 shadow-sm hover:border-brand-200 hover:shadow-md'
       }
     `}>
@@ -55,47 +55,46 @@ const StatCard: React.FC<StatCardProps> = ({
           {label}
         </h3>
         {trend !== undefined && (
-          <div className={`flex items-center space-x-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
-            isNeutral
-                ? (theme === 'dark' ? 'text-slate-400 bg-slate-800 border-transparent' : 'text-slate-600 bg-slate-100 border-slate-200')
-                : isGood
-                    ? (theme === 'dark' ? 'text-emerald-400 bg-emerald-950/30 border-emerald-900/50' : 'text-emerald-700 bg-emerald-50 border-emerald-200')
-                    : (theme === 'dark' ? 'text-rose-400 bg-rose-950/30 border-rose-900/50' : 'text-rose-700 bg-rose-50 border-rose-200')
-          }`}>
+          <div className={`flex items-center space-x-1 text-xs font-bold px-2 py-0.5 rounded-full border ${isNeutral
+            ? (theme === 'dark' ? 'text-slate-400 bg-slate-800 border-transparent' : 'text-slate-600 bg-slate-100 border-slate-200')
+            : isGood
+              ? (theme === 'dark' ? 'text-emerald-400 bg-emerald-950/30 border-emerald-900/50' : 'text-emerald-700 bg-emerald-50 border-emerald-200')
+              : (theme === 'dark' ? 'text-rose-400 bg-rose-950/30 border-rose-900/50' : 'text-rose-700 bg-rose-50 border-rose-200')
+            }`}>
             {isPositiveMath ? <TrendingUp size={10} /> : isNeutral ? <Minus size={10} /> : <TrendingDown size={10} />}
             <span>{Math.abs(trend)}%</span>
           </div>
         )}
       </div>
-      
+
       <div className="flex items-end justify-between relative z-10">
         <div className={`text-3xl font-bold tracking-tight tabular-nums ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-            {prefix}{value}{suffix}
+          {prefix}{value}{suffix}
         </div>
-        
+
         {/* Sparkline Chart */}
         {sparklineData && sparklineData.length > 0 && (
-            <div className="h-12 w-28 -mb-2 -mr-2 opacity-80 group-hover:opacity-100 transition-opacity relative">
-                {/* Added debounce to fix width(-1) warnings */}
-                <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                    <AreaChart data={sparklineData}>
-                        <defs>
-                            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={color} stopOpacity={theme === 'dark' ? 0.3 : 0.15}/>
-                                <stop offset="95%" stopColor={color} stopOpacity={0}/>
-                            </linearGradient>
-                        </defs>
-                        <Area 
-                            type="monotone" 
-                            dataKey={dataKey} 
-                            stroke={color} 
-                            strokeWidth={2} 
-                            fillOpacity={1} 
-                            fill={`url(#${gradientId})`} 
-                        />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </div>
+          <div className="h-12 w-28 -mb-2 -mr-2 opacity-80 group-hover:opacity-100 transition-opacity relative">
+            {/* Added debounce to fix width(-1) warnings */}
+            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+              <AreaChart data={sparklineData}>
+                <defs>
+                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={color} stopOpacity={theme === 'dark' ? 0.3 : 0.15} />
+                    <stop offset="95%" stopColor={color} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area
+                  type="monotone"
+                  dataKey={dataKey}
+                  stroke={color}
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill={`url(#${gradientId})`}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
     </div>

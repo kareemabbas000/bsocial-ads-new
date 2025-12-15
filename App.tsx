@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from './services/supabaseClient';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -12,11 +12,114 @@ import AdminPanel from './pages/AdminPanel';
 import { AppState, DateSelection, Theme, GlobalFilter, AccountHierarchy, AdAccount } from './types';
 import { fetchAccountHierarchy, fetchAdAccounts, clearCache } from './services/metaService';
 import { fetchUserProfile, fetchUserConfig, fetchSystemSetting, updateUserConfig } from './services/supabaseService';
-import LoadingSpinner from './components/LoadingSpinner'; // Added
+import LoadingSpinner from './components/LoadingSpinner';
 import AccessDenied from './components/AccessDenied';
-// import CookieConsent from './components/CookieConsent'; // Moved to Login
+import ReportingEngine from './pages/ReportingEngine';
+import Onboarding from './pages/Onboarding';
+
+// Helper Component for Router Mode (Extracting logic that needs Router Context)
+const RouterApp: React.FC<{
+  appProps: any;
+  theme: Theme;
+  toggleTheme: () => void;
+  handleDisconnect: () => void;
+  hierarchy: AccountHierarchy;
+  filter: GlobalFilter;
+  setFilter: (f: GlobalFilter) => void;
+  accountNames: string[];
+  handleManualRefresh: () => void;
+  dateSelection: DateSelection;
+  setDateSelection: (d: DateSelection) => void;
+  loading: boolean;
+}> = ({
+  appProps, theme, toggleTheme, handleDisconnect, hierarchy, filter, setFilter,
+  accountNames, handleManualRefresh, dateSelection, setDateSelection, loading
+}) => {
+    const location = useLocation();
+    const activeTab = location.pathname.substring(1) || 'dashboard';
+    const { appState, allowedFeatures, isDateLocked, isFilterLocked, refreshInterval, refreshTrigger } = appProps;
+
+    // Sync Global Filter updates to URL? (Optional enhancement later)
+
+    // Guard: Connection Wait
+    if (!appState.metaToken && activeTab !== 'admin' && activeTab !== 'login') {
+      // Allow admin route to render? No, admin panel is inside layout.
+      // If we are just loading token, show spinner.
+      return <LoadingSpinner theme={theme} message="Connecting to Meta..." />;
+    }
+
+    // Guard: Access Denied (Zero Access)
+    const hasGlobalAccess = (appState.userRole === 'admin') || appState.adAccountIds.length > 0;
+    if (!hasGlobalAccess) {
+      return <AccessDenied theme={theme} onContactSupport={() => window.location.href = 'mailto:info@bsocial-eg.com'} onLogout={handleDisconnect} />;
+    }
+
+    const commonProps = {
+      token: appState.metaToken!,
+      accountIds: appState.adAccountIds,
+      datePreset: dateSelection,
+      theme,
+      filter,
+      userConfig: appState.userConfig,
+      refreshInterval,
+      refreshTrigger,
+      // Add for specific components if needed
+      hierarchy
+    };
+
+    const hasAccess = (feature: string) => {
+      // Admin has access to everything
+      if (appState.userRole === 'admin') return true;
+      const allowed = appState.userConfig?.allowed_features || [];
+      return allowed.includes(feature);
+    };
+
+    const ProtectedRoute = ({ feature, children }: { feature: string, children: React.ReactNode }) => {
+      if (!hasAccess(feature)) {
+        return <div className="p-8 text-center text-slate-500">Access Restricted</div>;
+      }
+      return <>{children}</>;
+    };
+
+    return (
+      <Layout
+        activeTab={activeTab}
+        onNavigate={() => { }} // Controlled by Link in Router Mode
+        navigationMode="router"
+        onDisconnect={handleDisconnect}
+        dateSelection={dateSelection}
+        onDateChange={setDateSelection}
+        theme={theme}
+        onThemeToggle={toggleTheme}
+        hierarchy={hierarchy}
+        filter={filter}
+        onFilterChange={setFilter}
+        userRole={appState.userRole}
+        allowedFeatures={allowedFeatures}
+        isDateLocked={isDateLocked}
+        accountNames={accountNames}
+        onManualRefresh={handleManualRefresh}
+        hideAccountName={appState.userConfig?.hide_account_name}
+      >
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<ProtectedRoute feature="dashboard"><Dashboard {...commonProps} /></ProtectedRoute>} />
+          <Route path="/campaigns" element={<ProtectedRoute feature="campaigns"><Campaigns {...commonProps} /></ProtectedRoute>} />
+          <Route path="/ads-hub" element={<ProtectedRoute feature="ads-hub"><CreativeHub {...commonProps} /></ProtectedRoute>} />
+          <Route path="/ai-lab" element={<ProtectedRoute feature="ai-lab"><AILab theme={theme} /></ProtectedRoute>} />
+          <Route path="/report-kitchen" element={<ProtectedRoute feature="report-kitchen"><ReportingEngine {...commonProps} hierarchy={hierarchy} /></ProtectedRoute>} />
+          {/* Admin Route */}
+          {appState.userRole === 'admin' && (
+            <Route path="/admin" element={<AdminPanel theme={theme} />} />
+          )}
+          <Route path="*" element={<div className="p-8 text-center text-slate-500">Page Not Found</div>} />
+        </Routes>
+      </Layout>
+    );
+  };
 
 const App: React.FC = () => {
+  // ... existing state
   const [session, setSession] = useState<any>(null);
   const [appState, setAppState] = useState<AppState>({
     metaToken: null,
@@ -24,12 +127,12 @@ const App: React.FC = () => {
     isConnected: false,
   });
 
+  // New: Feature Flag
+  const [enableRouter, setEnableRouter] = useState(false);
 
-
+  // ... (keep all existing state: activeTab, dateSelection, theme, etc.)
   const [activeTab, setActiveTab] = useState('dashboard');
-
   const [dateSelection, setDateSelection] = useState<DateSelection>({ preset: 'last_30d' });
-
   // CHANGED: Default theme set to 'dark', checking localStorage first
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
@@ -42,14 +145,10 @@ const App: React.FC = () => {
   const [hierarchy, setHierarchy] = useState<AccountHierarchy>({ campaigns: [], adSets: [], ads: [] });
   const [filter, setFilter] = useState<GlobalFilter>({ searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] });
   const [loading, setLoading] = useState(true);
-
-  // New: Account Display Info
   const [accountNames, setAccountNames] = useState<string[]>([]);
-
-  // Manual Refresh Trigger
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Persist State
+  // ... (keep useEffects for persistence) ...
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
@@ -65,16 +164,15 @@ const App: React.FC = () => {
     } else {
       document.body.classList.remove('dark');
     }
-  }, [theme]); // This keeps the effect for normal re-renders, but flushSync handles the immediate toggle
+  }, [theme]);
 
-
-  // Stabilize Connection State for Listener
+  // Stabilize Connection
   const isConnectedRef = useRef(appState.isConnected);
   useEffect(() => {
     isConnectedRef.current = appState.isConnected;
   }, [appState.isConnected]);
 
-  // Initialize Session & Auth Listener
+  // Auth Listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -85,39 +183,57 @@ const App: React.FC = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
+      // Prevent App re-render if token hasn't changed (e.g. tab focus event with same session)
+      setSession(prev => {
+        if (prev?.access_token === session?.access_token) return prev;
+        return session;
+      });
+
       if (session) {
-        // Optimization: Only re-initialize if user CHANGED or we weren't connected.
         if (!isConnectedRef.current) {
           initializeUser(session.user.id);
         }
       } else {
         setAppState({ metaToken: null, adAccountIds: [], isConnected: false });
-        // Clear all sensitive data on logout
+        // Clear sensitive data
         setHierarchy({ campaigns: [], adSets: [], ads: [] });
         setAccountNames([]);
         setFilter({ searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] });
         setLoading(false);
+
+        // Reset URL to root on logout to match standard SaaS UX
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          window.history.replaceState(null, '', '/');
+        }
       }
     });
-
     return () => subscription.unsubscribe();
-  }, []); // Run once on mount to prevent listener churn
+  }, []);
 
-  const initializeUser = async (userId: string) => {
-    // Fix: Only show full screen loader if we don't have valid state yet. 
-    // This prevents "dark screen" flicker on token refresh or window restore.
-    if (!appState.isConnected) {
+  const initializeUser = async (userId: string, retryCount = 0) => {
+    if (!appState.isConnected && retryCount === 0) {
       setLoading(true);
     }
-
     try {
-      const [profile, config, token] = await Promise.all([
+      const [profile, config, token, routerEnabled] = await Promise.all([
         fetchUserProfile(userId),
         fetchUserConfig(userId),
-        fetchSystemSetting('meta_token')
+        fetchSystemSetting('meta_token'),
+        fetchSystemSetting('enable_react_router') // Fetch Flag
       ]);
 
+      if (routerEnabled !== null) {
+        setEnableRouter(routerEnabled === 'true');
+      }
+
+      if ((!profile || !config) && retryCount < 3) {
+        // ... retry logic
+        console.warn(`Fetch failed. Retrying... (${retryCount + 1}/3)`);
+        setTimeout(() => initializeUser(userId, retryCount + 1), 500);
+        return;
+      }
+
+      // ... (existing initialization logic) ...
       if (token && config && config.ad_account_ids.length > 0) {
         setAppState({
           metaToken: token,
@@ -127,21 +243,33 @@ const App: React.FC = () => {
           userConfig: config
         });
 
-        // Fetch Account Names for Header Display
+        // ... (check onboarding) ...
+        if (!profile?.company || profile.company === 'Default Organization') {
+          setAppState(prev => ({ ...prev, needsOnboarding: true }));
+        } else {
+          setAppState(prev => ({ ...prev, needsOnboarding: false }));
+        }
+
+        // Fetch Accounts
         try {
           const allAccounts = await fetchAdAccounts(token);
           const names = allAccounts
-            .filter(acc => config.ad_account_ids.includes(acc.id))
+            .filter(acc => {
+              // Robust ID matching: handle 'act_' prefix mismatch
+              const accIdClean = acc.id.replace('act_', '');
+              const configIdsClean = config.ad_account_ids.map(id => id.replace('act_', ''));
+              return configIdsClean.includes(accIdClean);
+            })
             .map(acc => acc.name);
           setAccountNames(names);
-        } catch (e) { console.error("Failed to fetch account names"); }
-
-        // Set Theme if exists
-        if (config.theme) {
-          setTheme(config.theme);
+        } catch (e) {
+          console.error(e);
         }
 
+        // Set Theme
+        if (config.theme) setTheme(config.theme);
       } else {
+        // ... non-connected state logic ...
         setAppState(prev => ({
           ...prev,
           metaToken: token,
@@ -149,14 +277,16 @@ const App: React.FC = () => {
           userRole: profile?.role,
           userConfig: config || undefined
         }));
-
-        // Set Theme if exists
-        if (config?.theme) {
-          setTheme(config.theme);
+        // ... onboarding logic ...
+        if (!profile?.company || profile.company === 'Default Organization') {
+          setAppState(prev => ({ ...prev, needsOnboarding: true }));
+        } else {
+          setAppState(prev => ({ ...prev, needsOnboarding: false }));
         }
+        if (config?.theme) setTheme(config.theme);
       }
 
-      // Apply Fixed Date Config
+      // Config Apply
       if (config?.fixed_date_start && config?.fixed_date_end) {
         setDateSelection({
           preset: 'custom',
@@ -164,22 +294,26 @@ const App: React.FC = () => {
         });
       }
 
-      // Apply Allowed Sections Rule
-      const allowed = config?.allowed_features || ['dashboard', 'campaigns', 'creative-hub', 'ai-lab'];
+      // Allowed Sections & Redirect (Logic mostly relevant for legacy state mode)
+      const allowed = config?.allowed_features || ['dashboard', 'campaigns', 'ads-hub', 'ai-lab'];
       if (profile?.role !== 'admin' && !allowed.includes('dashboard') && allowed.length > 0) {
         if (activeTab === 'dashboard' && !allowed.includes('dashboard')) {
           setActiveTab(allowed[0]);
         }
       }
 
-    } catch (e) {
-      console.error("Init failed", e);
-    } finally {
       setLoading(false);
+    } catch (e) {
+      console.error(e);
+      if (retryCount < 3) {
+        setTimeout(() => initializeUser(userId, retryCount + 1), 1000);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
-  // Load Hierarchy when connection is ready
+  // ... (keep useEffect for hierarchy)
   useEffect(() => {
     if (appState.isConnected && appState.metaToken && appState.adAccountIds.length > 0) {
       const loadHierarchy = async () => {
@@ -190,16 +324,9 @@ const App: React.FC = () => {
     }
   }, [appState.isConnected, appState.adAccountIds, appState.metaToken, refreshTrigger]);
 
+  // ... (keep handleDisconnect, toggleTheme, handleManualRefresh)
   const handleDisconnect = async () => {
-    // 1. Attempt native sign out (backend)
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.error("Sign out error:", e);
-    }
-
-    // 2. FORCE update local state to redirect immediately
-    // This guarantees the user is taken to Login screen even if backend lags
+    try { await supabase.auth.signOut(); } catch (e) { console.error(e); }
     setSession(null);
     setAppState({ metaToken: null, adAccountIds: [], isConnected: false });
     setHierarchy({ campaigns: [], adSets: [], ads: [] });
@@ -209,65 +336,84 @@ const App: React.FC = () => {
 
   const toggleTheme = async () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
-
-    // 1. Visual Update (Instant)
     const updateVisuals = () => {
       setTheme(nextTheme);
-      // Manually toggle body class immediately for the view transition snapshot
-      // (React's useEffect would be too late for the snapshot without flushSync)
       if (nextTheme === 'dark') document.body.classList.add('dark');
       else document.body.classList.remove('dark');
     };
 
-    // 2. Persist to DB (Background)
     const persistTheme = async () => {
       if (session?.user?.id && appState.userRole) {
-        try {
-          // Fixed: Use standard import
-          await updateUserConfig(session.user.id, { theme: nextTheme });
-        } catch (e) {
-          console.error("Failed to save theme preference", e);
-        }
+        try { await updateUserConfig(session.user.id, { theme: nextTheme }); } catch (e) { }
       }
     };
 
-    // 3. Execute Transition
     if ((document as any).startViewTransition) {
       (document as any).startViewTransition(() => {
-        flushSync(() => {
-          updateVisuals();
-        });
+        flushSync(() => { updateVisuals(); });
       });
     } else {
       updateVisuals();
     }
-
-    // Fire and forget persistence
     persistTheme();
   };
 
   const handleManualRefresh = () => {
-    clearCache(); // Force next fetches to hit API
-
-    // Also re-fetch ad accounts if connected
+    clearCache();
     if (appState.isConnected && appState.metaToken) {
-      fetchAdAccounts(appState.metaToken).then(accounts => {
-        // Update appState if needed? 
-      });
+      fetchAdAccounts(appState.metaToken).then(() => { });
     }
-
     setRefreshTrigger(prev => prev + 1);
   };
 
-  // Replaced ugly div with LoadingSpinner
+  // Rendering
   if (loading) return <LoadingSpinner theme={theme} message="Initializing ADHub..." />;
+  if (!session) return <Login theme={theme} />;
 
-  if (!session) {
-    return <Login theme={theme} />;
+  if (appState.needsOnboarding) {
+    return <Onboarding session={session} onComplete={() => handleManualRefresh()} />;
   }
 
-  // Admin View Logic
+  // --- ROUTER MODE RENDER ---
+  if (enableRouter) {
+    const allowedFeatures = appState.userConfig?.allowed_features;
+    const isDateLocked = !!(appState.userConfig?.fixed_date_start && appState.userConfig?.fixed_date_end);
+    const isFilterLocked = !!(appState.userConfig?.global_campaign_filter && appState.userConfig.global_campaign_filter.length > 0);
+    const refreshInterval = appState.userConfig?.refresh_interval || 10;
+
+    // Pack props
+    const appProps = {
+      appState,
+      allowedFeatures,
+      isDateLocked,
+      isFilterLocked,
+      refreshInterval,
+      refreshTrigger
+    };
+
+    return (
+      <BrowserRouter>
+        <RouterApp
+          appProps={appProps}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          handleDisconnect={handleDisconnect}
+          hierarchy={hierarchy}
+          filter={filter}
+          setFilter={setFilter}
+          accountNames={accountNames}
+          handleManualRefresh={handleManualRefresh}
+          dateSelection={dateSelection}
+          setDateSelection={setDateSelection}
+          loading={loading}
+        />
+      </BrowserRouter>
+    );
+  }
+
+  // --- LEGACY STATE MODE RENDER ---
   if (appState.userRole === 'admin' && activeTab === 'admin') {
+    // ...
     return (
       <Layout
         activeTab={activeTab}
@@ -290,18 +436,16 @@ const App: React.FC = () => {
     );
   }
 
-  // Permissions Data
+  // ... (keep permission data extraction for legacy)
   const allowedFeatures = appState.userConfig?.allowed_features;
   const isDateLocked = !!(appState.userConfig?.fixed_date_start && appState.userConfig?.fixed_date_end);
   const isFilterLocked = !!(appState.userConfig?.global_campaign_filter && appState.userConfig.global_campaign_filter.length > 0);
-  const refreshInterval = appState.userConfig?.refresh_interval || 10; // Default 10 mins
+  const refreshInterval = appState.userConfig?.refresh_interval || 10;
 
   const renderContent = () => {
+    // ... (logic remains same as original)
     const allowed = allowedFeatures || [];
-    const isAdmin = appState.userRole === 'admin';
 
-    // Guard: Ensure we have a token before rendering data-heavy components (unless Admin Panel?)
-    // This prevents "Empty Page" if connection is lost but session exists.
     if (!appState.metaToken && activeTab !== 'admin') {
       return <LoadingSpinner theme={theme} message="Connecting to Meta..." />;
     }
@@ -332,8 +476,8 @@ const App: React.FC = () => {
           refreshTrigger={refreshTrigger}
           hierarchy={hierarchy}
         />;
-      case 'creative-hub':
-        if (allowed.length > 0 && !allowed.includes('creative-hub')) return <div className="p-8 text-center text-slate-500">Access Restricted</div>;
+      case 'ads-hub':
+        if (allowed.length > 0 && !allowed.includes('ads-hub') && !allowed.includes('creative-hub')) return <div className="p-8 text-center text-slate-500">Access Restricted</div>;
         return <CreativeHub
           token={appState.metaToken!}
           accountIds={appState.adAccountIds}
@@ -347,12 +491,23 @@ const App: React.FC = () => {
       case 'ai-lab':
         if (allowed.length > 0 && !allowed.includes('ai-lab')) return <div className="p-8 text-center text-slate-500">Access Restricted</div>;
         return <AILab theme={theme} />;
+      case 'report-kitchen':
+        if (allowed.length > 0 && !allowed.includes('report-kitchen') && !allowed.includes('reporting-engine')) return <div className="p-8 text-center text-slate-500">Access Restricted</div>;
+        return <ReportingEngine
+          token={appState.metaToken!}
+          accountIds={appState.adAccountIds}
+          datePreset={dateSelection}
+          theme={theme}
+          filter={filter}
+          userConfig={appState.userConfig}
+          hierarchy={hierarchy}
+        />;
       default:
-        // Default to Dashboard but check permission
+        // Default Fallbacks
         if (allowed.length > 0 && !allowed.includes('dashboard')) {
-          // If dashboard is restricted, find first allowed tab
           if (allowed.includes('campaigns')) return <Campaigns token={appState.metaToken!} accountIds={appState.adAccountIds} datePreset={dateSelection} theme={theme} filter={filter} userConfig={appState.userConfig} refreshInterval={refreshInterval} refreshTrigger={refreshTrigger} hierarchy={hierarchy} />;
-          if (allowed.includes('creative-hub')) return <CreativeHub token={appState.metaToken!} accountIds={appState.adAccountIds} datePreset={dateSelection} theme={theme} filter={filter} userConfig={appState.userConfig} refreshInterval={refreshInterval} refreshTrigger={refreshTrigger} />;
+          if (allowed.includes('ads-hub') || allowed.includes('creative-hub')) return <CreativeHub token={appState.metaToken!} accountIds={appState.adAccountIds} datePreset={dateSelection} theme={theme} filter={filter} userConfig={appState.userConfig} refreshInterval={refreshInterval} refreshTrigger={refreshTrigger} />;
+          if (allowed.includes('report-kitchen') || allowed.includes('reporting-engine')) return <ReportingEngine token={appState.metaToken!} accountIds={appState.adAccountIds} datePreset={dateSelection} theme={theme} filter={filter} userConfig={appState.userConfig} hierarchy={hierarchy} />;
           if (allowed.includes('ai-lab')) return <AILab theme={theme} />;
           return <div className="p-8 text-center text-slate-500">Please select a section from the menu.</div>;
         }
@@ -361,15 +516,8 @@ const App: React.FC = () => {
   };
 
   const hasAccess = (appState.userRole === 'admin') || appState.adAccountIds.length > 0;
-
   if (!hasAccess) {
-    return (
-      <AccessDenied
-        theme={theme}
-        onContactSupport={() => window.location.href = 'mailto:info@bsocial-eg.com?subject=Request Access to ADHub'}
-        onLogout={handleDisconnect}
-      />
-    );
+    return <AccessDenied theme={theme} onContactSupport={() => window.location.href = 'mailto:info@bsocial-eg.com'} onLogout={handleDisconnect} />;
   }
 
   return (
@@ -392,9 +540,6 @@ const App: React.FC = () => {
       hideAccountName={appState.userConfig?.hide_account_name}
     >
       {React.cloneElement(renderContent() as React.ReactElement<any>, { filterLocked: isFilterLocked })}
-
-      {/* Global Overlays */}
-
     </Layout>
   );
 };

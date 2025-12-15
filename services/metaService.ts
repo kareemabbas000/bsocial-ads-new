@@ -114,12 +114,15 @@ export const fetchAccountHierarchy = async (adAccountIds: string[], token: strin
         const formattedId = accId.startsWith('act_') ? accId : `act_${accId}`;
 
         try {
-            // Reverted to FLAT fields (campaign_id) as requested by user
-            // This was the "working" state before recent changes
+            // Robust encoding for status param
+            const statusArr = ["ACTIVE", "PAUSED", "ARCHIVED", "IN_PROCESS", "WITH_ISSUES"];
+            const statusParam = `&effective_status=${encodeURIComponent(JSON.stringify(statusArr))}`;
+
+            // Use nested fields for better compatibility
             const [campResponse, adsetResponse, adsResponse] = await Promise.all([
-                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=id,name&limit=500&access_token=${token}`),
-                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/adsets?fields=id,name,campaign_id&limit=500&access_token=${token}`),
-                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/ads?fields=id,name,campaign_id,adset_id&limit=500&access_token=${token}`)
+                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=id,name,status&limit=500${statusParam}&access_token=${token}`),
+                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/adsets?fields=id,name,campaign{id}&limit=500${statusParam}&access_token=${token}`),
+                fetch(`${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/ads?fields=id,name,campaign{id},adset{id}&limit=500${statusParam}&access_token=${token}`)
             ]);
 
             const campData = await campResponse.json();
@@ -129,23 +132,28 @@ export const fetchAccountHierarchy = async (adAccountIds: string[], token: strin
             // Explicitly log errors to debug "zero" counts
             if (campData.error) console.error(`[Meta API] Campaign Error ${accId}:`, campData.error);
             if (adsetData.error) console.error(`[Meta API] AdSet Error ${accId}:`, adsetData.error);
+            else console.log(`[Meta API] AdSets Fetched for ${accId}:`, adsetData.data?.length, adsetData.data?.[0]); // Log first item to check structure
             if (adsData.error) console.error(`[Meta API] Ads Error ${accId}:`, adsData.error);
 
             return {
-                campaigns: (campData.data || []).map((c: any) => ({
-                    id: c.id,
-                    name: c.name
-                })),
+                campaigns: (campData.data || []).map((c: any) => {
+                    // Debug Log for Campaigns
+                    // console.log(`[Meta API] Processed Campaign: ${c.id} - ${c.name}`);
+                    return {
+                        id: c.id,
+                        name: c.name
+                    };
+                }),
                 adSets: (adsetData.data || []).map((a: any) => ({
                     id: a.id,
                     name: a.name,
-                    campaign_id: a.campaign_id // Flat field
+                    campaign_id: a.campaign?.id // Handle nested field
                 })),
                 ads: (adsData.data || []).map((a: any) => ({
                     id: a.id,
                     name: a.name,
-                    campaign_id: a.campaign_id, // Flat field
-                    adset_id: a.adset_id        // Flat field
+                    campaign_id: a.campaign?.id, // Handle nested field
+                    adset_id: a.adset?.id        // Handle nested field
                 }))
             };
         } catch (e) {
@@ -197,7 +205,7 @@ export const fetchCampaignsBatch = async (accountIds: string[], token: string): 
     const promises = uniqueIds.map(async (accId) => {
         const formattedId = accId.startsWith('act_') ? accId : `act_${accId}`;
         try {
-            const url = `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=id,name&limit=500&access_token=${token}`;
+            const url = `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=id,name&limit=500&effective_status=['ACTIVE','PAUSED','ARCHIVED','IN_PROCESS','WITH_ISSUES']&access_token=${token}`;
             const res = await fetch(url);
             const data = await res.json();
             return (data.data || []).map((c: any) => ({
@@ -334,7 +342,7 @@ export const fetchCampaignsWithInsights = async (
 
         try {
             const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=${dynFields}&limit=50&access_token=${token}${filtering}&use_account_attribution_setting=true`
+                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=${dynFields}&limit=50&effective_status=['ACTIVE','PAUSED','ARCHIVED','IN_PROCESS','WITH_ISSUES']&access_token=${token}${filtering}&use_account_attribution_setting=true`
             );
             const data = await response.json();
             if (data.error) throw new Error(data.error.message);
@@ -402,13 +410,19 @@ export const fetchAdSetsWithInsights = async (
             timeFilter = `.time_range(${range})`;
         }
 
-        const fields = `id,campaign_id,name,status,daily_budget,lifetime_budget,start_time,end_time,targeting,billing_event,optimization_goal,bid_amount,pacing_type,ads{id},insights${timeFilter}{spend,impressions,clicks,cpc,ctr,reach,actions,action_values,purchase_roas}`;
+        const fields = `id,campaign_id,name,status,daily_budget,lifetime_budget,start_time,end_time,targeting,billing_event,optimization_goal,bid_amount,pacing_type,ads{id},insights${timeFilter}{spend,impressions,clicks,cpc,ctr,cpm,reach,frequency,actions,action_values,purchase_roas}`;
+
+        // Robust encoding
+        const statusArr = ["ACTIVE", "PAUSED", "ARCHIVED", "IN_PROCESS", "WITH_ISSUES"];
+        const statusParam = `&effective_status=${encodeURIComponent(JSON.stringify(statusArr))}`;
 
         try {
             const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/adsets?fields=${fields},campaign{objective}&limit=50&access_token=${token}${filtering}&use_account_attribution_setting=true`
+                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/adsets?fields=${fields},campaign{objective}&limit=50${statusParam}&access_token=${token}${filtering}&use_account_attribution_setting=true`
             );
             const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+
             return (data.data || []).map((adset: any) => {
                 const insights = adset.insights ? adset.insights.data[0] : null;
                 const objective = adset.campaign?.objective || 'UNKNOWN';
@@ -432,6 +446,7 @@ export const fetchAdSetsWithInsights = async (
                 };
             });
         } catch (e) {
+            console.error(`Fetch adsets failed for ${accId}`, e);
             return [];
         }
     });
@@ -470,13 +485,18 @@ export const fetchAdsWithInsights = async (
 
         const fields = `id,adset_id,campaign_id,name,status,creative{id},campaign{objective},insights${timeFilter}{spend,impressions,clicks,unique_clicks,cpc,ctr,cpm,reach,frequency,inline_link_clicks,inline_post_engagement,actions,action_values,outbound_clicks,video_play_actions,video_p100_watched_actions,video_thruplay_watched_actions,purchase_roas}`;
 
+        // Robust encoding
+        const statusArr = ["ACTIVE", "PAUSED", "ARCHIVED", "IN_PROCESS", "WITH_ISSUES"];
+        const statusParam = `&effective_status=${encodeURIComponent(JSON.stringify(statusArr))}`;
+
         try {
             const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/ads?fields=${fields}&limit=50&access_token=${token}${filtering}&use_account_attribution_setting=true`
+                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/ads?fields=${fields}&limit=1000${statusParam}&access_token=${token}${filtering}&use_account_attribution_setting=true`
             );
             const data = await response.json();
             return data.data || [];
         } catch (e) {
+            console.error(`Fetch ads failed for ${accId}`, e);
             return [];
         }
     });
@@ -516,7 +536,9 @@ export const fetchAdsWithInsights = async (
                         asset_feed_spec: c.asset_feed_spec
                     };
                 });
-            } catch (e) { }
+            } catch (e) {
+                console.error(`Fetch creative chunk failed`, e);
+            }
         }
     }
 
@@ -640,7 +662,7 @@ const mergeDailyInsights = (allResults: DailyInsight[][]) => {
         const d = curr.date_start;
         if (!acc[d]) {
             acc[d] = {
-                date_start: d, spend: 0, impressions: 0, clicks: 0, reach: 0, post_engagement: 0, leads: 0, messaging_conversations: 0, purchase_value: 0
+                date_start: d, spend: 0, impressions: 0, clicks: 0, reach: 0, post_engagement: 0, leads: 0, messaging_conversations: 0, purchases: 0, purchase_value: 0
             };
         }
         acc[d].spend += curr.spend;
@@ -650,6 +672,7 @@ const mergeDailyInsights = (allResults: DailyInsight[][]) => {
         acc[d].post_engagement += curr.post_engagement;
         acc[d].leads += curr.leads;
         acc[d].messaging_conversations += curr.messaging_conversations;
+        acc[d].purchases += curr.purchases;
 
         // Calculate Revenue from this day's ROAS * Spend if revenue not explicit
         let dailyRoas = curr.roas || 0;
@@ -672,6 +695,45 @@ const mergeDailyInsights = (allResults: DailyInsight[][]) => {
 
     return mergedList.sort((a: any, b: any) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime());
 };
+
+// ... existing code ...
+
+export const fetchTopPerformingAds = async (
+    adAccountIds: string[],
+    token: string,
+    dateSelection: DateSelection,
+    filter?: GlobalFilter
+): Promise<AdPerformance[]> => {
+    // Reuses fetchAdsWithInsights logic but sorts by Spend/ROAS and returns Simplified list
+    const adsResponse = await fetchAdsWithInsights(adAccountIds, token, dateSelection, filter);
+    const ads = adsResponse.data;
+
+    // Sort by Spend descending as default "Top" metric
+    // Can be adjusted to ROAS if needed via param, but for Reporting Engine "Top Posts" usually means highest volume/spend/impact
+    const sorted = ads.sort((a, b) => {
+        const spendA = parseFloat(a.insights?.spend || '0');
+        const spendB = parseFloat(b.insights?.spend || '0');
+        return spendB - spendA;
+    });
+
+    // Map to AdPerformance
+    return sorted.map(ad => {
+        const insights = ad.insights;
+        return {
+            ...insights,
+            ad_id: ad.id,
+            ad_name: ad.name,
+            status: ad.status,
+            creative: ad.creative,
+            roas: (insights as any)?.roas || 0, // Ensure these exist on InsightData or calculated
+            cpa: insights?.cost_per_result ? parseFloat(insights.cost_per_result) : 0, // Helper check
+            results: insights?.results || '0',
+            cost_per_result: insights?.cost_per_result || '0',
+            // Add missing props if any
+        } as unknown as AdPerformance;
+    });
+};
+
 
 const mergeHourlyInsights = (allResults: HourlyInsight[][]) => {
     // ... (same logic as before)
@@ -809,7 +871,7 @@ export const fetchDailyAccountInsights = async (
     dateSelection: DateSelection,
     filter?: GlobalFilter
 ): Promise<DailyInsight[]> => {
-    const cacheKey = generateKey('fetchDailyAccountInsights', adAccountIds, dateSelection, filter);
+    const cacheKey = generateKey('fetchDailyAccountInsights_v2', adAccountIds, dateSelection, filter);
     const cached = getCache(cacheKey);
     if (cached) return cached as DailyInsight[];
 
@@ -820,7 +882,7 @@ export const fetchDailyAccountInsights = async (
 
         try {
             const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/insights?time_increment=1&fields=spend,impressions,reach,clicks,inline_link_clicks,cpc,ctr,actions,action_values&limit=5000&access_token=${token}${dateParam}${filtering}`
+                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/insights?time_increment=1&fields=spend,impressions,reach,clicks,inline_link_clicks,cpc,ctr,actions,action_values&limit=5000&level=account&access_token=${token}${dateParam}${filtering}`
             );
             const data = await response.json();
             return (data.data || []).map((day: any) => {
@@ -837,6 +899,13 @@ export const fetchDailyAccountInsights = async (
                     ctr: parseFloat(day.ctr || '0'),
                     cpc: parseFloat(day.cpc || '0'),
                     roas: calculateROAS(day),
+                    purchases: (() => {
+                        const actions = day.actions || [];
+                        let conversions = actions.find((a: any) => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
+                        if (!conversions) conversions = actions.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase');
+                        if (!conversions) conversions = actions.find((a: any) => a.action_type.toLowerCase().includes('purchase'));
+                        return conversions ? parseFloat(conversions.value) : 0;
+                    })(),
                     post_engagement: parseInt(postEngagements),
                     leads: parseInt(leads),
                     messaging_conversations: parseInt(msgs),
@@ -871,7 +940,7 @@ export const fetchHourlyInsights = async (
 
         try {
             const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/insights?breakdowns=hourly_stats_aggregated_by_audience_time_zone&fields=spend,impressions,clicks,reach,actions,action_values&limit=1000&access_token=${token}${dateParam}${filtering}`
+                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/insights?breakdowns=hourly_stats_aggregated_by_audience_time_zone&fields=spend,impressions,clicks,reach,actions,action_values&limit=1000&level=account&access_token=${token}${dateParam}${filtering}`
             );
             const data = await response.json();
             if (!data.data) return [];
@@ -926,11 +995,20 @@ export const fetchPlacementBreakdown = async (
         const filtering = buildFilteringParam(filter);
         const dateParam = getDateParam(dateSelection);
         try {
-            const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/insights?breakdowns=publisher_platform,platform_position&fields=spend,impressions,reach,clicks,actions,action_values&limit=100&access_token=${token}${dateParam}${filtering}`
-            );
-            const data = await response.json();
-            return data.data || [];
+            let allData: any[] = [];
+            let nextUrl = `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/insights?breakdowns=publisher_platform,platform_position&fields=spend,impressions,reach,clicks,actions,action_values&limit=500&level=account&access_token=${token}${dateParam}${filtering}`;
+
+            while (nextUrl) {
+                const response = await fetch(nextUrl);
+                const data = await response.json();
+                if (data.data) {
+                    allData = [...allData, ...data.data];
+                }
+                nextUrl = data.paging?.next || null;
+                // Safety break
+                if (allData.length > 5000) break;
+            }
+            return allData;
         } catch (e) { return []; }
     });
 
@@ -976,11 +1054,20 @@ export const fetchBreakdown = async (
         const filtering = buildFilteringParam(filter);
         const dateParam = getDateParam(dateSelection);
         try {
-            const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/insights?breakdowns=${breakdownType}&fields=spend,impressions,reach,clicks,actions,action_values&limit=500&access_token=${token}${dateParam}${filtering}`
-            );
-            const data = await response.json();
-            return data.data || [];
+            let allData: any[] = [];
+            let nextUrl = `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/insights?breakdowns=${breakdownType}&fields=spend,impressions,reach,clicks,actions,action_values&limit=500&level=account&access_token=${token}${dateParam}${filtering}`;
+
+            while (nextUrl) {
+                const response = await fetch(nextUrl);
+                const data = await response.json();
+                if (data.data) {
+                    allData = [...allData, ...data.data];
+                }
+                nextUrl = data.paging?.next || null;
+                // Safety break
+                if (allData.length > 5000) break;
+            }
+            return allData;
         } catch (e) { return []; }
     });
 
@@ -990,7 +1077,7 @@ export const fetchBreakdown = async (
     flat.forEach(i => {
         let key = '';
         if (breakdownType === 'age,gender') key = `${i.age}-${i.gender}`;
-        else if (breakdownType === 'region') key = i.region;
+        else if (breakdownType === 'region') key = i.region || 'Unknown';
         else key = i[breakdownType.split(',')[0]];
 
         if (!map[key]) {

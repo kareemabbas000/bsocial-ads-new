@@ -181,6 +181,7 @@ export interface AppState {
   isConnected: boolean;
   userRole?: 'admin' | 'client';
   userConfig?: UserConfig;
+  needsOnboarding?: boolean; // New
 }
 
 export interface AIAnalysisResult {
@@ -282,7 +283,7 @@ export interface UserConfig {
   user_id: string;
   ad_account_ids: string[];
   allowed_profiles: string[]; // 'sales', 'engagement', 'leads', 'messenger'
-  allowed_features: string[]; // 'campaigns', 'creative-hub', 'ai-lab'
+  allowed_features: string[]; // 'campaigns', 'ads-hub', 'ai-lab'
   hide_total_spend: boolean;
   spend_multiplier: number;
   global_campaign_filter: string[];
@@ -292,6 +293,7 @@ export interface UserConfig {
   disable_ai?: boolean;
   disable_creative_tags?: boolean;
   hide_account_name?: boolean;
+  enable_report_preview?: boolean;
   theme?: Theme;
 }
 

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { Campaign, AIAnalysisResult, AdPerformance } from "../types";
+import { Campaign, AIAnalysisResult, AdPerformance, AdSet, Ad } from "../types";
 
 // Helper to calculate blended metrics for context
 const calculateBlendedMetrics = (campaigns: Campaign[]) => {
@@ -224,5 +224,227 @@ export const generateAdCopy = async (productDescription: string, objective: stri
   } catch (error) {
     console.error("Copy Gen Failed", error);
     return "Error generating copy.";
+  }
+};
+
+export const generatePerformanceAudit = async (
+  accountInsights: any,
+  campaigns: Campaign[],
+  adSets: AdSet[],
+  ads: Ad[],
+  breakdowns?: {
+    placements?: any[],
+    demographics?: any[],
+    regions?: any[]
+  },
+  profile: string = 'sales', // Default to sales if not provided
+  dateRange: string = 'Last 30 Days' // Default date range
+): Promise<AIAnalysisResult> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    // --- 1. DEFINE PROFILE GOALS & SUCCESS METRICS ---
+
+    let objectiveTitle = "MAXIMIZE REVENUE (ROAS)";
+    let primaryMetricLabel = "ROAS";
+    let costMetricLabel = "CPA (Cost Per Purchase)";
+    let primaryMetricKey = "roas"; // Key to look up in processed data
+    let thresholdLabel = "ROAS";
+
+    // Dynamic Metric Extraction Helper
+    const getProfileMetrics = (insights: any) => {
+      const spend = parseFloat(insights.spend || '0');
+
+      if (profile === 'leads') {
+        const leads = parseInt(insights.actions?.find((a: any) => a.action_type === 'lead')?.value || '0');
+        return {
+          mainValue: leads,
+          mainLabel: 'Leads',
+          costValue: leads > 0 ? spend / leads : 0,
+          costLabel: 'CPL',
+          isEfficiencyBadIfHigh: true // High CPL is bad, unlike High ROAS which is good
+        };
+      } else if (profile === 'engagement') {
+        const eng = parseInt(insights.actions?.find((a: any) => a.action_type === 'post_engagement')?.value || '0');
+        return {
+          mainValue: eng,
+          mainLabel: 'Engagements',
+          costValue: eng > 0 ? spend / eng : 0,
+          costLabel: 'CPE',
+          isEfficiencyBadIfHigh: true
+        };
+      } else if (profile === 'messenger') {
+        const msg = parseInt(insights.actions?.find((a: any) => a.action_type === 'onsite_conversion.messaging_conversation_started_7d' || a.action_type === 'messaging_conversation_started_7d')?.value || '0');
+        return {
+          mainValue: msg,
+          mainLabel: 'Msgs',
+          costValue: msg > 0 ? spend / msg : 0,
+          costLabel: 'Cost/Msg',
+          isEfficiencyBadIfHigh: true
+        };
+      }
+
+      // Default: Sales
+      const roas = insights.roas || (spend > 0 ? (parseFloat(insights.purchase_value || insights.action_values?.[0]?.value || '0') / spend) : 0);
+      return {
+        mainValue: roas,
+        mainLabel: 'ROAS',
+        costValue: insights.cost_per_result || 0,
+        costLabel: 'CPA',
+        isEfficiencyBadIfHigh: false // High ROAS is good
+      };
+    };
+
+    // Set Context Strings based on Profile
+    if (profile === 'leads') {
+      objectiveTitle = "MAXIMIZE LEAD VOLUME & QUALITY";
+      primaryMetricLabel = "Leads";
+      costMetricLabel = "CPL (Cost Per Lead)";
+      thresholdLabel = "CPL";
+    } else if (profile === 'engagement') {
+      objectiveTitle = "MAXIMIZE BRAND ENGAGEMENT";
+      primaryMetricLabel = "Post Engagements";
+      costMetricLabel = "CPE (Cost Per Engagement)";
+      thresholdLabel = "CPE";
+    } else if (profile === 'messenger') {
+      objectiveTitle = "MAXIMIZE MESSAGING CONVERSATIONS";
+      primaryMetricLabel = "New Conversations";
+      costMetricLabel = "Cost Per Message";
+      thresholdLabel = "Cost/Msg";
+    }
+
+    // --- 2. PRE-PROCESS DATA WITH DYNAMIC METRICS ---
+
+    // A. Account Level Snapshot
+    const accountStatsRaw = getProfileMetrics(accountInsights || {});
+    const accountStats = {
+      spend: parseFloat(accountInsights?.spend || '0'),
+      primary: accountStatsRaw.mainValue,
+      cost: accountStatsRaw.costValue,
+      ctr: parseFloat(accountInsights?.ctr || '0'),
+      frequency: parseFloat(accountInsights?.frequency || '0')
+    };
+
+    // B. Campaign Analysis (Active vs Paused)
+    // Sort logic depends on profile: Sales uses Spend/ROAS, others might prioritize volume or cost
+    // We stick to Spend desc for "Kill Zone" analysis as that's where risk is
+    const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE').sort((a, b) => parseFloat(b.insights?.spend || '0') - parseFloat(a.insights?.spend || '0'));
+    const pausedCampaigns = campaigns.filter(c => c.status !== 'ACTIVE').sort((a, b) => parseFloat(b.insights?.spend || '0') - parseFloat(a.insights?.spend || '0')).slice(0, 5);
+
+    const formatCampaign = (c: Campaign) => {
+      const i = c.insights || {} as any;
+      const spend = parseFloat(i.spend || '0');
+      const metrics = getProfileMetrics({ ...i, roas: i.roas }); // Pass i.roas as fallback for sales
+
+      const mainValStr = profile === 'sales' ? `${metrics.mainValue.toFixed(2)}x` : metrics.mainValue.toLocaleString();
+      const costValStr = `$${metrics.costValue.toFixed(2)}`;
+
+      return `- **${c.name}** | Spend: $${spend.toFixed(0)} | ${metrics.mainLabel}: ${mainValStr} | ${metrics.costLabel}: ${costValStr} | CTR: ${parseFloat(i.ctr || '0').toFixed(2)}%`;
+    };
+
+    // C. Ad Level Analysis
+    const activeAds = ads.filter(a => a.status === 'ACTIVE' && parseFloat(a.insights?.spend || '0') > 50).sort((a, b) => parseFloat(b.insights?.spend || '0') - parseFloat(a.insights?.spend || '0'));
+
+    // Detect Fatigue
+    const fatiguedAds = activeAds.filter(a => parseFloat(a.insights?.frequency || '0') > 2.4).slice(0, 3).map(a => `${a.name} (Freq: ${a.insights?.frequency})`);
+
+    // Detect Winners (Dynamic)
+    const topAds = activeAds.filter(a => {
+      const m = getProfileMetrics({ ...(a.insights || {}), roas: (a.insights as any)?.roas });
+      if (profile === 'sales') return m.mainValue > accountStats.primary; // Higher ROAS is better
+      return m.costValue < accountStats.cost && m.costValue > 0; // Lower CPL/CPE/MsgCost is better
+    }).slice(0, 3).map(a => {
+      const m = getProfileMetrics({ ...(a.insights || {}), roas: (a.insights as any)?.roas });
+      return `${a.name} (${m.mainLabel}: ${profile === 'sales' ? m.mainValue.toFixed(2) + 'x' : m.mainValue})`;
+    });
+
+    // D. Breakdowns
+    const topPlacement = breakdowns?.placements?.sort((a, b) => parseFloat(b.spend) - parseFloat(a.spend))[0]?.publisher_platform || "N/A";
+    const topAge = breakdowns?.demographics?.sort((a, b) => parseFloat(b.spend) - parseFloat(a.spend))[0]?.age || "N/A";
+    const topRegion = breakdowns?.regions?.sort((a, b) => parseFloat(b.spend) - parseFloat(a.spend))[0]?.region || "N/A";
+
+    // --- 3. CONSTRUCT DYNAMIC PROMPT ---
+
+    const prompt = `
+      You are a Senior Meta Ads Media Buyer conducting a "Deep Dive" Performance Audit.
+
+      **CONTEXT:**
+      - **AUDIT PROFILE:** ${profile.toUpperCase()}
+      - **MAIN GOAL:** ${objectiveTitle}
+      - This audit must be tailored specifically to optimize for **${primaryMetricLabel}**.
+
+      **STYLE GUIDELINES:**
+      - **Tone:** Direct, confident, professional, and actionable.
+      - **Structure:** Follow the logical flow below EXACTLY.
+
+      --- DATA SOURCE (${profile.toUpperCase()} OPTIMIZED) ---
+
+      **1. 📊 GLOBAL ACCOUNT PERFORMANCE (Last 30 Days)**
+      - Total Spend: $${accountStats.spend.toFixed(0)}
+      - **Account ${primaryMetricLabel}: ${profile === 'sales' ? accountStats.primary.toFixed(2) + 'x' : accountStats.primary.toLocaleString()}**
+      - **Account ${costMetricLabel}: $${accountStats.cost.toFixed(2)}**
+      - CTR: ${accountStats.ctr.toFixed(2)}%
+
+      **2. 🚀 ACTIVE CAMPAIGNS (Scale Candidates)**
+      ${activeCampaigns.map(formatCampaign).join('\n')}
+
+      **3. 🛑 PAUSED CAMPAIGNS (Historical Context)**
+      ${pausedCampaigns.map(formatCampaign).join('\n')}
+
+      **4. 🎨 CREATIVE INTELLIGENCE**
+      - Potential Creative Fatigue (Freq > 2.4): ${fatiguedAds.length > 0 ? fatiguedAds.join(', ') : "No major fatigue detected yet."}
+      - Top Performing Creatives (Best ${profile === 'sales' ? 'ROAS' : 'Cost Efficiency'}): ${topAds.length > 0 ? topAds.join(', ') : "N/A"}
+
+      **5. 🌍 DELIVERY INSIGHTS**
+      - Top Placement: ${topPlacement}
+      - Top Demographic: ${topAge}
+
+      --- YOUR OUTPUT REPORT (GENERATE THIS EXACTLY) ---
+
+      # 🎯 Audit Scope: ${profile.toUpperCase()} Profile
+      (1 sentence confirming this audit is strictly optimized for **${objectiveTitle}** based on the selected Data View of **${dateRange}**.)
+
+      # 📈 Overall Performance Summary
+      (1 short paragraph. Are we hitting our ${costMetricLabel} targets? Is the volume of ${primaryMetricLabel} sufficient?)
+
+      # 🚀 Campaigns to Scale (ACTIVE Only)
+      (Identify ACTIVE campaigns performing BETTER than account average (${profile === 'sales' ? 'higher ROAS' : 'lower ' + costMetricLabel}). Recommend budget increases for efficiency winners.)
+
+      # 🛑 Campaigns to Stop Immediately (ACTIVE Only)
+      (Identify ACTIVE campaigns with poor performance (${profile === 'sales' ? 'Low ROAS' : 'High ' + costMetricLabel}). Be ruthless.)
+
+      # 🧠 Historical Learnings (PAUSED Campaigns)
+      (Did we pause campaigns that actually had good ${costMetricLabel}? Or was pausing justified?)
+
+      # 🛠 Tactical Optimization Plan
+      (3-4 Bullet points. Be specific.)
+      - **Focus on [Winner Name]:** [Action].
+      - **Creative:** [Comment on fatigue].
+      - **Audience:** [Comment on ${topPlacement} or ${topAge} validity for this goal].
+
+      # ✅ Executive Takeaway
+      (3 bullet points summarizing the plan).
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
+
+    const text = response.text || "Could not generate analysis.";
+
+    return {
+      analysis: text,
+      recommendations: [],
+      sentiment: text.toLowerCase().includes('good') || text.toLowerCase().includes('scale') ? 'positive' : 'neutral'
+    };
+
+  } catch (error) {
+    console.error("AI Audit Failed", error);
+    return {
+      analysis: "Unable to connect to AI service currently. Please check your network or try again later.",
+      recommendations: [],
+      sentiment: 'neutral'
+    };
   }
 };
