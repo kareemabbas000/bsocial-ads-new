@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from './services/supabaseClient';
+import { Session } from '@supabase/supabase-js';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -184,7 +185,7 @@ const App: React.FC = () => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       // Prevent App re-render if token hasn't changed (e.g. tab focus event with same session)
-      setSession(prev => {
+      setSession((prev: Session | null) => {
         if (prev?.access_token === session?.access_token) return prev;
         return session;
       });

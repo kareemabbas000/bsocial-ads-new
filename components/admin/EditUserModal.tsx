@@ -38,7 +38,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
         company: user.company || '',
         ad_account_ids: user.config?.ad_account_ids || [],
         allowed_profiles: user.config?.allowed_profiles || ['sales'],
-        allowed_profiles: user.config?.allowed_profiles || ['sales'],
         allowed_features: (user.config?.allowed_features || ['dashboard', 'campaigns', 'ads-hub', 'ai-lab']).map(f => {
             // Auto-migrate legacy keys on edit to ensure toggling works correctly
             if (f === 'creative-hub') return 'ads-hub';

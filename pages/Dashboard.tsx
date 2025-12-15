@@ -513,7 +513,9 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                     regions: regionData
                 },
                 profile,
-                datePreset.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) // "last_30d" -> "Last 30d"
+                (datePreset.preset === 'custom' && datePreset.custom)
+                    ? `${datePreset.custom.startDate} - ${datePreset.custom.endDate}`
+                    : datePreset.preset.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
             );
             setAiAnalysis(result.analysis);
         } catch (e) {

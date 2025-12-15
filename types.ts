@@ -200,6 +200,7 @@ export interface DailyInsight {
   cpc: number;
   roas: number;
   purchase_value?: number; // Added for strict ROAS calc
+  purchases?: number; // Added for accumulation
   purchase_roas?: { action_type: string; value: string }[]; // Added for strict ROAS calc
   post_engagement: number;
   leads: number;
