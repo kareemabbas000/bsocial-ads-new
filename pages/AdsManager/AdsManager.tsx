@@ -116,9 +116,14 @@ const AdsManagerContent: React.FC = () => {
         (adSetsResp?.data?.length || 0) > 0 ||
         (adsResp?.data?.length || 0) > 0;
 
-    if (hasData) {
-        initialLoadRef.current = true;
-    }
+    // FIX: Set initial load to complete as soon as the first loading sequence finishes,
+    // regardless of whether we have data or not. This prevents the full-screen loader
+    // from reappearing when switching to empty tabs (e.g. AdSets with no items).
+    useEffect(() => {
+        if (!loading) {
+            initialLoadRef.current = true;
+        }
+    }, [loading]);
 
     // Reset pagination on filter/level change
     useEffect(() => {

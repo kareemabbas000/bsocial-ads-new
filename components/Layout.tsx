@@ -148,13 +148,18 @@ const Layout: React.FC<LayoutProps> = ({
           <div className={`relative z-10 flex flex-col items-center justify-center ${isSidebarCollapsed ? 'py-6' : 'py-8'}`}>
             <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'space-x-4'}`}>
 
-              {/* Logo Container with "Reactor Core" Glow */}
-              <div className="relative group cursor-pointer">
-                <div className={`absolute inset-0 rounded-full bg-blue-500/30 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isSidebarCollapsed ? 'scale-150' : 'scale-125'}`}></div>
+              {/* Logo Container with "Reactor Core" Glow - Elite Spread */}
+              <div className="relative group cursor-pointer flex items-center justify-center">
+                {/* 1. Main Soft Spread Glow (Persistent) - Reduced Opacity & Size */}
+                <div className={`absolute inset-0 rounded-full bg-blue-500/15 blur-2xl transition-all duration-500 group-hover:bg-blue-500/25 group-hover:blur-3xl ${isSidebarCollapsed ? 'w-12 h-12 scale-110' : 'w-14 h-14 scale-125'}`}></div>
+
+                {/* 2. Core Glow (Intense Center) - Tighter */}
+                <div className={`absolute inset-0 rounded-full bg-indigo-500/10 blur-xl transition-all duration-300 group-hover:bg-indigo-500/20 ${isSidebarCollapsed ? 'scale-100' : 'scale-90'}`}></div>
+
                 <img
                   src="https://icgkbruoltgvchbqednf.supabase.co/storage/v1/object/public/logos/Logo%20Bsocial%20Icon%20new.png"
                   alt="BSocial Logo"
-                  className={`relative z-10 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.15)] saturate-200 contrast-110 transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_25px_rgba(59,130,246,0.5)] ${isSidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`}
+                  className={`relative z-10 object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.4)] saturate-200 contrast-125 brightness-110 transition-all duration-300 group-hover:scale-105 group-hover:drop-shadow-[0_0_20px_rgba(59,130,246,0.6)] ${isSidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`}
                 />
               </div>
 
@@ -265,8 +270,8 @@ const Layout: React.FC<LayoutProps> = ({
           </nav>
 
           {/* --- FOOTER / CONTROL PAD --- */}
-          <div className={`p-4 mt-auto mb-2 w-full transition-all duration-300 ${isSidebarCollapsed ? 'items-center' : ''}`}>
-            <div className={`rounded-2xl p-2 flex flex-col gap-1 transition-all duration-300 ${isSidebarCollapsed ? 'bg-transparent' : (theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-slate-100/50 border border-slate-200')}`}>
+          <div className={`p-4 mt-auto mb-2 w-full ${isSidebarCollapsed ? 'items-center' : ''}`}>
+            <div className={`rounded-2xl p-2 flex flex-col gap-1 ${isSidebarCollapsed ? 'bg-transparent' : (theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-slate-100/50 border border-slate-200')}`}>
 
               {/* Manual Refresh */}
               {onManualRefresh && (
@@ -313,6 +318,19 @@ const Layout: React.FC<LayoutProps> = ({
 
       {/* Main Content */}
       < main className={`flex-1 flex flex-col relative overflow-hidden ${bgClass} w-full`}>
+
+        {/* --- ELITE TOP-RIGHT GLOW (AMBIENT) --- */}
+        {/* Soft, modern dark blue gradient as requested. No noise. */}
+        {theme === 'dark' && (
+          <div
+            className="absolute top-0 right-0 w-[800px] h-[600px] pointer-events-none z-0 opacity-40 mix-blend-screen"
+            style={{
+              background: 'radial-gradient(circle at top right, rgba(30, 58, 138, 0.4), rgba(30, 58, 138, 0.1), transparent 70%)',
+              filter: 'blur(80px)',
+              transform: 'translate3d(0, 0, 0)', // Force GPU acceleration for smoothness
+            }}
+          ></div>
+        )}
 
         {/* Top Bar - Responsive */}
         {/* Top Bar - Native macOS Style Glass */}
