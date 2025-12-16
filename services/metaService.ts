@@ -205,7 +205,9 @@ export const fetchCampaignsBatch = async (accountIds: string[], token: string): 
     const promises = uniqueIds.map(async (accId) => {
         const formattedId = accId.startsWith('act_') ? accId : `act_${accId}`;
         try {
-            const url = `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=id,name&limit=500&effective_status=['ACTIVE','PAUSED','ARCHIVED','IN_PROCESS','WITH_ISSUES']&access_token=${token}`;
+            const statusArr = ["ACTIVE", "PAUSED", "ARCHIVED", "IN_PROCESS", "WITH_ISSUES"];
+            const statusParam = `&effective_status=${encodeURIComponent(JSON.stringify(statusArr))}`;
+            const url = `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=id,name&limit=500${statusParam}&access_token=${token}`;
             const res = await fetch(url);
             const data = await res.json();
             return (data.data || []).map((c: any) => ({
@@ -340,12 +342,16 @@ export const fetchCampaignsWithInsights = async (
 
         const dynFields = `id,name,status,objective,buying_type,start_time,stop_time,special_ad_categories,daily_budget,lifetime_budget,adsets{id},insights${timeFilter}{spend,impressions,clicks,inline_link_clicks,cpc,cpm,ctr,reach,frequency,actions,action_values,purchase_roas}`;
 
+        const statusArr = ["ACTIVE", "PAUSED", "ARCHIVED", "IN_PROCESS", "WITH_ISSUES"];
+        const statusParam = `&effective_status=${encodeURIComponent(JSON.stringify(statusArr))}`;
+
         try {
             const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=${dynFields}&limit=50&effective_status=['ACTIVE','PAUSED','ARCHIVED','IN_PROCESS','WITH_ISSUES']&access_token=${token}${filtering}&use_account_attribution_setting=true`
+                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/campaigns?fields=${dynFields}&limit=500${statusParam}&access_token=${token}${filtering}&use_account_attribution_setting=true`
             );
             const data = await response.json();
             if (data.error) throw new Error(data.error.message);
+
             return (data.data || []).map((camp: any) => {
                 const insights = camp.insights ? camp.insights.data[0] : null;
                 // Count AdSets
@@ -422,7 +428,7 @@ export const fetchAdSetsWithInsights = async (
 
         try {
             const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/adsets?fields=${fields},campaign{objective}&limit=50${statusParam}&access_token=${token}${filtering}&use_account_attribution_setting=true`
+                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/adsets?fields=${fields},campaign{objective}&limit=500${statusParam}&access_token=${token}${filtering}&use_account_attribution_setting=true`
             );
             const data = await response.json();
             if (data.error) throw new Error(data.error.message);

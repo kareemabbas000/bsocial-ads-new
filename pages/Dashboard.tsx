@@ -715,7 +715,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
             </div>
 
             {/* Primary KPI Grid */}
-            <div className={`grid grid-cols-1 md:grid-cols-2 ${hideTotalSpend ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} gap-4`}>
+            <div className={`grid grid-cols-1 md:grid-cols-2 ${hideTotalSpend ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
                 {activeConfig.cards.map((card: any) => {
                     // Filtered by activeConfig, no need for manual check
 
@@ -782,9 +782,9 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                 ))}
             </div >
 
-            <div className="grid grid-cols-1 2xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column: Charts */}
-                <div className={`${disableAi ? '2xl:col-span-3' : '2xl:col-span-2'} space-y-6`}>
+                <div className={`${disableAi ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-6`}>
 
                     {activeTab === 'overview' && (
                         <>
@@ -1491,7 +1491,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
 
                 {/* Right Column: AI Analysis Panel - Redesigned Single Action */}
                 {!disableAi && (
-                    <div className="2xl:col-span-1" ref={aiAuditRef}>
+                    <div className="lg:col-span-1" ref={aiAuditRef}>
                         <div className={`sticky top-24 rounded-2xl h-[calc(100vh-8rem)] flex flex-col overflow-hidden transition-all duration-500 group relative ${isDark
                             ? 'bg-[#0B0E16]/80 backdrop-blur-3xl border border-blue-500/20 shadow-[0_0_50px_-10px_rgba(37,99,235,0.15)]'
                             : 'bg-white/80 backdrop-blur-3xl border border-white/60 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]' // Enhanced Light Mode Shadow

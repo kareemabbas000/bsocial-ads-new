@@ -63,23 +63,23 @@ const UserManagement: React.FC<UserManagementProps> = ({
                 </h3>
             </div>
 
-            {/* MULTI-DEVICE VIEW: Table for 2X-Large Screens Only (Responsive) */}
-            <div className="hidden 2xl:block overflow-x-auto custom-scrollbar pb-2">
-                <table className="w-full text-left text-sm border-collapse min-w-[1000px]">
+            {/* MULTI-DEVICE VIEW: Table for Large Screens Only (Responsive) */}
+            <div className="hidden lg:block overflow-x-auto custom-scrollbar pb-2">
+                <table className="w-full text-left text-sm border-collapse min-w-[900px]">
                     <thead className={`uppercase text-[11px] tracking-wider font-bold ${isDark ? 'bg-slate-950/30 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
                         <tr>
-                            <th className="px-5 py-4 border-b border-transparent">User / Client</th>
-                            <th className="px-5 py-4 border-b border-transparent">Role</th>
-                            <th className="px-5 py-4 border-b border-transparent">Assigned Accounts</th>
-                            <th className="px-5 py-4 border-b border-transparent">Access</th>
-                            <th className="px-5 py-4 border-b border-transparent">Config</th>
-                            <th className="px-5 py-4 border-b border-transparent text-right">Actions</th>
+                            <th className="px-4 py-3 border-b border-transparent">User / Client</th>
+                            <th className="px-4 py-3 border-b border-transparent">Role</th>
+                            <th className="px-4 py-3 border-b border-transparent">Assigned Accounts</th>
+                            <th className="px-4 py-3 border-b border-transparent">Access</th>
+                            <th className="px-4 py-3 border-b border-transparent">Config</th>
+                            <th className="px-4 py-3 border-b border-transparent text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-100'}`}>
                         {users.map(user => (
                             <tr key={user.id} className={`group transition-colors ${isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
-                                <td className="px-5 py-4 align-top">
+                                <td className="px-4 py-3 align-top">
                                     <div className="flex flex-col">
                                         <div className={`font-bold text-sm mb-0.5 ${textClass}`}>
                                             {user.first_name ? `${user.first_name} ${user.last_name}` : user.email.split('@')[0]}
@@ -93,13 +93,13 @@ const UserManagement: React.FC<UserManagementProps> = ({
                                         )}
                                     </div>
                                 </td>
-                                <td className="px-5 py-4 align-top">
+                                <td className="px-4 py-3 align-top">
                                     <RoleBadge role={user.role} />
                                 </td>
-                                <td className="px-5 py-4 align-top max-w-[300px]">
+                                <td className="px-4 py-3 align-top max-w-[300px]">
                                     <AccountChips config={user.config} />
                                 </td>
-                                <td className="px-5 py-4 align-top">
+                                <td className="px-4 py-3 align-top">
                                     <div className="flex flex-wrap gap-1 max-w-[200px]">
                                         {user.config?.allowed_features?.map(f => (
                                             <span key={f} className={`text-[9px] px-1.5 py-0.5 rounded border uppercase ${isDark ? 'border-slate-700 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
@@ -108,13 +108,13 @@ const UserManagement: React.FC<UserManagementProps> = ({
                                         ))}
                                     </div>
                                 </td>
-                                <td className="px-5 py-4 align-top">
+                                <td className="px-4 py-3 align-top">
                                     <div className="text-[10px] flex flex-col gap-1">
                                         {user.config?.hide_total_spend && <span className="text-red-400 font-bold bg-red-400/10 px-2 py-0.5 rounded w-fit">Hidden Financials</span>}
                                         {user.config?.spend_multiplier && user.config?.spend_multiplier !== 1 && <span className="text-brand-400 font-bold bg-brand-400/10 px-2 py-0.5 rounded w-fit">x{user.config?.spend_multiplier} Mult</span>}
                                     </div>
                                 </td>
-                                <td className="px-5 py-4 text-right align-top">
+                                <td className="px-4 py-3 text-right align-top">
                                     <div className="flex justify-end gap-2">
                                         <button
                                             onClick={() => onEditUser(user)}
@@ -139,7 +139,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
             </div>
 
             {/* MOBILE & TABLET & LAPTOP VIEW: Cards */}
-            <div className="2xl:hidden p-4 space-y-4">
+            <div className="lg:hidden p-4 space-y-4">
                 {users.map(user => (
                     <div key={user.id} className={`p-4 rounded-xl border flex flex-col gap-4 ${isDark ? 'bg-slate-950/30 border-slate-800' : 'bg-slate-50/50 border-slate-200'}`}>
                         {/* Header */}

@@ -108,7 +108,8 @@ const AdsManagerContent: React.FC = () => {
     const loading = loadingCampaigns || loadingAdSets || loadingAds;
 
     // TRACK INITIAL LOAD: Only show Smart Loader once per session
-    // Use REF to track this across renders immediately
+    // We want to show it on the VERY first mount/fetch.
+    // Once we have fetched data (or determined there is none), we switch to "internal" loading (skeleton).
     const initialLoadRef = React.useRef(false);
 
     // Check if we have data NOW
@@ -116,9 +117,12 @@ const AdsManagerContent: React.FC = () => {
         (adSetsResp?.data?.length || 0) > 0 ||
         (adsResp?.data?.length || 0) > 0;
 
-    // FIX: Set initial load to complete as soon as the first loading sequence finishes,
-    // regardless of whether we have data or not. This prevents the full-screen loader
-    // from reappearing when switching to empty tabs (e.g. AdSets with no items).
+    // If we have data, we are definitely loaded at least once.
+    if (hasData) {
+        initialLoadRef.current = true;
+    }
+
+    // Also, if we finished loading (even if no data), we should mark as loaded so next time we use table skeleton.
     useEffect(() => {
         if (!loading) {
             initialLoadRef.current = true;

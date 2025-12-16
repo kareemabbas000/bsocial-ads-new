@@ -115,12 +115,12 @@ const Layout: React.FC<LayoutProps> = ({
 
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/50 z-[90] lg:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
       {/* Sidebar - Mobile (Slide Over) & Desktop (Fixed/Collapsible) */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 flex flex-col border-r transform will-change-[width] ${theme === 'dark'
+        className={`fixed lg:static inset-y-0 left-0 z-[100] flex flex-col border-r transform will-change-[width] ${theme === 'dark'
           ? 'bg-[#020617] border-white/5 shadow-[10px_0_50px_0_rgba(0,0,0,0.7)]'
           : 'bg-white/80 border-slate-200/60 backdrop-blur-2xl shadow-[5px_0_30px_0_rgba(0,0,0,0.03)]'
           } 
@@ -137,7 +137,7 @@ const Layout: React.FC<LayoutProps> = ({
           )}
 
           {/* 2. Radial Glow (Top Left) - "Ambient Light" */}
-          <div className={`absolute -top-20 -left-20 w-96 h-96 rounded-full blur-[100px] pointer-events-none z-0 transition-opacity duration-200 ${theme === 'dark' ? 'bg-brand-900/10 opacity-40' : 'bg-brand-50/60 opacity-50'}`}></div>
+          <div className={`absolute -top-20 -left-20 w-96 h-96 rounded-full blur-[100px] pointer-events-none z-0 ${theme === 'dark' ? 'bg-brand-900/10 opacity-40' : 'bg-brand-50/60 opacity-50'}`}></div>
 
           {/* 3. Bottom Gradient - "Grounding" */}
           <div className={`absolute bottom-0 inset-x-0 h-64 bg-gradient-to-t pointer-events-none z-0 ${theme === 'dark' ? 'from-black/80 to-transparent' : 'from-slate-100/50 to-transparent'}`}></div>
@@ -150,21 +150,21 @@ const Layout: React.FC<LayoutProps> = ({
 
               {/* Logo Container with "Reactor Core" Glow - Elite Spread */}
               <div className="relative group cursor-pointer flex items-center justify-center">
-                {/* 1. Main Soft Spread Glow (Persistent) - Reduced Opacity & Size */}
-                <div className={`absolute inset-0 rounded-full bg-blue-500/15 blur-2xl transition-all duration-500 group-hover:bg-blue-500/25 group-hover:blur-3xl ${isSidebarCollapsed ? 'w-12 h-12 scale-110' : 'w-14 h-14 scale-125'}`}></div>
+                {/* 1. Main Soft Spread Glow (Persistent) */}
+                <div className={`absolute inset-0 rounded-full bg-blue-500/20 blur-2xl group-hover:bg-blue-500/30 group-hover:blur-3xl ${isSidebarCollapsed ? 'w-16 h-16 scale-125' : 'w-20 h-20 scale-125'}`}></div>
 
-                {/* 2. Core Glow (Intense Center) - Tighter */}
-                <div className={`absolute inset-0 rounded-full bg-indigo-500/10 blur-xl transition-all duration-300 group-hover:bg-indigo-500/20 ${isSidebarCollapsed ? 'scale-100' : 'scale-90'}`}></div>
+                {/* 2. Core Glow (Intense Center) */}
+                <div className={`absolute inset-0 rounded-full bg-indigo-500/10 blur-xl group-hover:bg-indigo-500/20 ${isSidebarCollapsed ? 'scale-110' : 'scale-100'}`}></div>
 
                 <img
                   src="https://icgkbruoltgvchbqednf.supabase.co/storage/v1/object/public/logos/Logo%20Bsocial%20Icon%20new.png"
                   alt="BSocial Logo"
-                  className={`relative z-10 object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.4)] saturate-200 contrast-125 brightness-110 transition-all duration-300 group-hover:scale-105 group-hover:drop-shadow-[0_0_20px_rgba(59,130,246,0.6)] ${isSidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`}
+                  className={`relative z-10 object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.3)] saturate-200 contrast-110 group-hover:scale-105 group-hover:drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] ${isSidebarCollapsed ? 'w-8 h-auto' : 'w-10 h-auto'}`}
                 />
               </div>
 
               {!isSidebarCollapsed && (
-                <div className="flex flex-col opacity-0 animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
+                <div className="flex flex-col">
                   <h1 className={`text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r ${theme === 'dark' ? 'from-white via-slate-200 to-slate-400' : 'from-slate-900 via-slate-700 to-slate-500'}`}>
                     BSOCIAL
                   </h1>
@@ -181,7 +181,7 @@ const Layout: React.FC<LayoutProps> = ({
           <div className={`px-4 mb-8 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
             <button
               onClick={() => setIsCommandOpen(true)}
-              className={`relative overflow-hidden group border transition-all duration-300 rounded-xl flex items-center
+              className={`relative overflow-hidden group border rounded-xl flex items-center
             ${theme === 'dark'
                   ? 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/10 text-slate-400'
                   : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100 text-slate-500'
@@ -190,11 +190,10 @@ const Layout: React.FC<LayoutProps> = ({
             shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]
           `}
             >
-              {/* Shimmer Effect on Hover */}
-              <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+              {/* Shimmer Effect on Hover - Removed for Speed */}
 
               <div className="flex items-center justify-center relative z-10">
-                <Command size={16} className={`${isSidebarCollapsed ? '' : 'mr-3'} group-hover:text-brand-400 transition-colors`} />
+                <Command size={16} className={`${isSidebarCollapsed ? '' : 'mr-3'} group-hover:text-brand-400`} />
                 {!isSidebarCollapsed && <span className="font-medium text-sm">Search</span>}
               </div>
               {!isSidebarCollapsed && (
@@ -217,7 +216,7 @@ const Layout: React.FC<LayoutProps> = ({
                 ? 'text-slate-400 hover:text-white hover:bg-white/5'
                 : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80';
 
-              const sharedClasses = `relative flex items-center transition-all duration-300 group rounded-xl
+              const sharedClasses = `relative flex items-center group rounded-xl
             ${isActive ? activeClasses : inactiveClasses}
             ${isSidebarCollapsed ? 'justify-center w-10 h-10 p-0' : 'w-full px-4 py-3'}
           `;
@@ -230,7 +229,7 @@ const Layout: React.FC<LayoutProps> = ({
                   )}
 
                   {/* Icon Container */}
-                  <div className={`relative flex items-center justify-center transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                  <div className={`relative flex items-center justify-center ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
                     {isActive && (
                       <div className="absolute inset-0 bg-brand-500/40 blur-[8px] rounded-full"></div>
                     )}
@@ -238,14 +237,14 @@ const Layout: React.FC<LayoutProps> = ({
                   </div>
 
                   {!isSidebarCollapsed && (
-                    <span className={`ml-3 font-semibold tracking-wide text-sm ${isActive ? 'translate-x-1' : 'group-hover:translate-x-1'} transition-transform duration-300`}>
+                    <span className={`ml-3 font-semibold tracking-wide text-sm ${isActive ? 'translate-x-1' : 'group-hover:translate-x-1'}`}>
                       {item.label}
                     </span>
                   )}
 
                   {/* Tooltip for collapsed */}
                   {isSidebarCollapsed && (
-                    <div className={`absolute left-14 z-50 px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none translate-x-2 group-hover:translate-x-0 border border-white/10 shadow-xl`}>
+                    <div className={`absolute left-14 z-50 px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none translate-x-2 group-hover:translate-x-0 border border-white/10 shadow-xl`}>
                       {item.label}
                       {/* Arrow */}
                       <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45 border-l border-b border-white/10"></div>
@@ -275,27 +274,27 @@ const Layout: React.FC<LayoutProps> = ({
 
               {/* Manual Refresh */}
               {onManualRefresh && (
-                <button onClick={onManualRefresh} title="Refresh Data" className={`flex items-center rounded-lg p-2 transition-all hover:bg-brand-500/10 hover:text-brand-500 ${isSidebarCollapsed ? 'justify-center' : ''} ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <button onClick={onManualRefresh} title="Refresh Data" className={`flex items-center rounded-lg p-2 hover:bg-brand-500/10 hover:text-brand-500 ${isSidebarCollapsed ? 'justify-center' : ''} ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                   <RefreshCw size={16} className={`${!isSidebarCollapsed && 'mr-3'}`} />
                   {!isSidebarCollapsed && <span className="text-xs font-semibold">Refresh System</span>}
                 </button>
               )}
 
               {/* Theme Toggle */}
-              <button onClick={onThemeToggle} title="Switch Theme" className={`flex items-center rounded-lg p-2 transition-all hover:bg-brand-500/10 hover:text-brand-500 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+              <button onClick={onThemeToggle} title="Switch Theme" className={`flex items-center rounded-lg p-2 hover:bg-brand-500/10 hover:text-brand-500 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                 <div className="flex items-center">
                   {theme === 'dark' ? <Moon size={16} className={!isSidebarCollapsed ? "mr-3 text-brand-300" : ""} /> : <Sun size={16} className={!isSidebarCollapsed ? "mr-3 text-orange-500" : ""} />}
                   {!isSidebarCollapsed && <span className="text-xs font-semibold">{theme === 'dark' ? 'Dark Node' : 'Light Mode'}</span>}
                 </div>
                 {!isSidebarCollapsed && (
-                  <div className={`w-6 h-3 rounded-full relative transition-colors duration-300 ${theme === 'dark' ? 'bg-brand-600' : 'bg-slate-300'}`}>
-                    <div className={`absolute top-0.5 w-2 h-2 rounded-full bg-white transition-all duration-300 ${theme === 'dark' ? 'left-[calc(100%-10px)]' : 'left-0.5'}`}></div>
+                  <div className={`w-6 h-3 rounded-full relative ${theme === 'dark' ? 'bg-brand-600' : 'bg-slate-300'}`}>
+                    <div className={`absolute top-0.5 w-2 h-2 rounded-full bg-white ${theme === 'dark' ? 'left-[calc(100%-10px)]' : 'left-0.5'}`}></div>
                   </div>
                 )}
               </button>
 
               {/* Sign Out */}
-              <button onClick={onDisconnect} title="Sign Out" className={`mt-1 flex items-center rounded-lg p-2 transition-all hover:bg-red-500/10 hover:text-red-500 text-slate-400 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+              <button onClick={onDisconnect} title="Sign Out" className={`mt-1 flex items-center rounded-lg p-2 hover:bg-red-500/10 hover:text-red-500 text-slate-400 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
                 <LogOut size={16} className={`${!isSidebarCollapsed && 'mr-3'}`} />
                 {!isSidebarCollapsed && <span className="text-xs font-semibold">Sign Out</span>}
               </button>
@@ -307,7 +306,7 @@ const Layout: React.FC<LayoutProps> = ({
         {/* Floating Collapse Toggle - Glass Pill */}
         <button
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className={`hidden lg:flex items-center justify-center absolute -right-3 top-24 z-50 w-6 h-6 rounded-full border shadow-lg backdrop-blur-md transition-all hover:scale-110 ${theme === 'dark'
+          className={`hidden lg:flex items-center justify-center absolute -right-3 top-24 z-[100] w-6 h-6 rounded-full border shadow-lg backdrop-blur-md hover:scale-110 ${theme === 'dark'
             ? 'bg-slate-900/80 border-white/10 text-slate-400 hover:text-white hover:border-brand-500/50 shadow-black/50'
             : 'bg-white/80 border-white/60 text-slate-500 hover:text-brand-600 hover:border-brand-200 shadow-slate-200/50'
             }`}
@@ -334,7 +333,7 @@ const Layout: React.FC<LayoutProps> = ({
 
         {/* Top Bar - Responsive */}
         {/* Top Bar - Native macOS Style Glass */}
-        <header className={`min-h-[5rem] flex flex-col lg:flex-row items-center justify-between px-6 lg:px-8 z-20 transition-all gap-4 py-3 sticky top-0 relative ${theme === 'dark'
+        <header className={`min-h-[5rem] flex flex-col lg:flex-row items-center justify-between px-6 lg:px-8 z-[80] gap-4 py-3 sticky top-0 relative ${theme === 'dark'
           ? 'bg-[#020617]/80 border-b border-white/5 backdrop-blur-xl supports-[backdrop-filter]:bg-[#020617]/60 shadow-[0_4px_30px_rgba(0,0,0,0.5)]'
           : 'bg-white/80 border-b border-slate-200/60 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 shadow-sm'
           }`}>
@@ -360,7 +359,7 @@ const Layout: React.FC<LayoutProps> = ({
 
               <div className="flex items-center gap-3 text-sm flex-1">
                 {/* Integrated Global Filter - Enhanced Container */}
-                <div className={`flex relative transition-all duration-300 ${theme === 'dark' ? 'hover:shadow-[0_0_15px_rgba(59,130,246,0.1)]' : ''}`}>
+                <div className={`flex relative ${theme === 'dark' ? 'hover:shadow-[0_0_15px_rgba(59,130,246,0.1)]' : ''}`}>
                   <GlobalFilter
                     hierarchy={hierarchy}
                     filter={filter}
@@ -405,7 +404,7 @@ const Layout: React.FC<LayoutProps> = ({
         </header>
 
         {/* Live Data Strip - Redesigned: 'Holographic Laser Line' */}
-        <div className={`w-full h-px relative flex items-center justify-center z-10 mt-6 mb-2 ${theme === 'dark' ? 'bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent' : 'bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent'}`}>
+        <div className={`w-full h-px relative flex items-center justify-center z-[60] mt-6 mb-2 ${theme === 'dark' ? 'bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent' : 'bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent'}`}>
           <div className={`absolute -top-3 px-3 py-1 rounded-full border shadow-[0_0_15px_rgba(16,185,129,0.2)] flex items-center gap-2 backdrop-blur-xl ${theme === 'dark'
             ? 'bg-[#0B0E16]/80 border-emerald-500/20 text-emerald-400'
             : 'bg-white/80 border-emerald-500/30 text-emerald-600'

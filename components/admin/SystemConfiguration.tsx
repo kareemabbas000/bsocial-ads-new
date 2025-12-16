@@ -51,7 +51,7 @@ const SystemConfiguration: React.FC<SystemConfigurationProps> = ({
                     <p className="text-xs text-slate-500">Global settings applied to the entire application instance.</p>
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Toggles Group */}
                     <div className={`p-4 rounded-xl border flex flex-col justify-center gap-4 h-full ${isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200/60'}`}>
                         {/* Google Auth Toggle */}
@@ -89,7 +89,7 @@ const SystemConfiguration: React.FC<SystemConfigurationProps> = ({
                     </div>
 
                     {/* Meta Token Section - Spans 2 cols on large screens */}
-                    <div className="md:col-span-1 lg:col-span-2 flex flex-col gap-2">
+                    <div className="lg:col-span-2 flex flex-col gap-2">
                         <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                             <Key size={14} /> Global Meta Access Token
                         </label>
