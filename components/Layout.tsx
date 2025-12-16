@@ -96,153 +96,13 @@ const Layout: React.FC<LayoutProps> = ({
   // Handle screen resize to reset sidebar state
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) {
+      if (window.innerWidth >= 1024) {
         setIsSidebarOpen(false); // Reset mobile state on desktop
       }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  const NavContent = () => (
-    <>
-      <div className={`transition-all duration-300 ease-in-out flex items-center ${isSidebarCollapsed ? 'w-full justify-center py-6 px-0' : 'w-full justify-between p-6'}`}>
-        <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center w-full' : 'space-x-3'}`}>
-          {/* BSocial Logo */}
-          <img
-            src="https://icgkbruoltgvchbqednf.supabase.co/storage/v1/object/public/logos/Logo%20Bsocial%20Icon%20new.png"
-            alt="BSocial Logo"
-            className={`rounded-full object-contain bg-slate-900 shadow-lg shadow-blue-500/30 shrink-0 border border-white/10 ${isSidebarCollapsed ? 'w-10 h-10' : 'w-10 h-10'}`}
-          />
-
-          {!isSidebarCollapsed && (
-            <div className="overflow-hidden flex flex-col justify-center">
-              <h1 className={`text-lg font-extrabold tracking-tight whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-brand-900'}`}>
-                BSOCIAL
-              </h1>
-              <p className={`text-[10px] font-bold uppercase tracking-[0.2em] whitespace-nowrap ${theme === 'dark' ? 'text-brand-400' : 'text-brand-600'}`}>AD INTELLIGENCE</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className={`px-4 mb-4 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
-        <button
-          onClick={() => setIsCommandOpen(true)}
-          className={`border text-sm py-2 px-3 rounded-md flex items-center transition-all group ${theme === 'dark'
-            ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
-            : 'bg-white border-slate-200 hover:border-brand-300 hover:shadow-sm text-slate-600'
-            } ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full justify-between'}`}
-        >
-          <div className="flex items-center justify-center">
-            <Command size={14} className={`${isSidebarCollapsed ? '' : 'mr-2'} group-hover:text-brand-500`} />
-            {!isSidebarCollapsed && <span>Search...</span>}
-          </div>
-          {!isSidebarCollapsed && <span className={`text-xs px-1.5 py-0.5 rounded border ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>⌘K</span>}
-        </button>
-      </div>
-
-      <nav className="flex-1 px-3 space-y-1 w-full flex flex-col items-center">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-
-          const sharedClasses = `flex items-center transition-all duration-200 text-sm font-semibold group relative overflow-hidden backdrop-blur-sm ${isActive
-            ? theme === 'dark'
-              ? 'bg-brand-500/10 text-white shadow-[inset_0_0_20px_rgba(59,130,246,0.1)] border border-brand-500/20 shadow-brand-500/10'
-              : 'bg-white/60 text-brand-700 border border-white/50 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md'
-            : theme === 'dark'
-              ? 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent hover:border-white/5'
-              : 'text-slate-500 hover:bg-white/40 hover:text-brand-800 border border-transparent hover:border-white/30'
-            } ${isSidebarCollapsed ? 'justify-center w-12 h-12 rounded-xl p-0' : 'space-x-3 w-full px-4 py-3.5 rounded-2xl'}`;
-
-          const content = (
-            <>
-              <Icon size={18} className={`shrink-0 ${isActive ? 'text-brand-500' : 'text-slate-400 group-hover:text-brand-400'}`} />
-              {!isSidebarCollapsed && <span>{item.label}</span>}
-
-              {/* Tooltip for collapsed mode */}
-              {isSidebarCollapsed && (
-                <div className={`absolute left-full ml-2 px-2 py-1 rounded bg-slate-900 text-white text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg border border-slate-700`}>
-                  {item.label}
-                </div>
-              )}
-            </>
-          );
-
-          if (navigationMode === 'router') {
-            return (
-              <Link
-                key={item.id}
-                to={`/${item.id === 'dashboard' ? '' : item.id}`}
-                className={sharedClasses}
-                onClick={() => setIsSidebarOpen(false)}
-              >
-                {content}
-              </Link>
-            );
-          }
-
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                onNavigate(item.id);
-                setIsSidebarOpen(false); // Close mobile menu on click
-              }}
-              className={sharedClasses}
-            >
-              {content}
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className={`p-4 border-t flex flex-col gap-2 w-full ${borderClass}`}>
-        {onManualRefresh && (
-          <button
-            onClick={onManualRefresh}
-            className={`flex items-center rounded-lg text-xs font-medium transition-all ${theme === 'dark'
-              ? 'bg-slate-900 text-slate-400 hover:text-white border border-transparent'
-              : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm'
-              } ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full px-3 py-2 justify-between'}`}
-            title="Refresh Data"
-          >
-            <span className="flex items-center justify-center">
-              <span className={isSidebarCollapsed ? '' : 'mr-2'}><RefreshCw size={14} /></span>
-              {!isSidebarCollapsed && 'Refresh Data'}
-            </span>
-          </button>
-        )}
-
-        <button
-          onClick={onThemeToggle}
-          className={`flex items-center rounded-lg text-xs font-medium transition-all ${theme === 'dark'
-            ? 'bg-slate-900 text-slate-400 hover:text-white border border-transparent'
-            : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm'
-            } ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full px-3 py-2 justify-between'}`}
-        >
-          <span className="flex items-center justify-center">
-            <span className={isSidebarCollapsed ? '' : 'mr-2'}>{theme === 'dark' ? <Moon size={14} /> : <Sun size={14} className="text-orange-500" />}</span>
-            {!isSidebarCollapsed && (theme === 'dark' ? 'Dark Mode' : 'Light Mode')}
-          </span>
-          {!isSidebarCollapsed && (
-            <div className={`w-8 h-4 rounded-full p-0.5 flex transition-colors ${theme === 'dark' ? 'bg-brand-600 justify-end' : 'bg-slate-300 justify-start'}`}>
-              <div className="w-3 h-3 bg-white rounded-full shadow-sm"></div>
-            </div>
-          )}
-        </button>
-
-        <button
-          onClick={onDisconnect}
-          className={`flex items-center space-x-2 text-xs font-medium text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full px-4 py-2 justify-center'}`}
-        >
-          <LogOut size={14} />
-          {!isSidebarCollapsed && <span>Sign Out</span>}
-        </button>
-      </div>
-    </>
-  );
 
   return (
     <div className={`${theme} ${theme === 'dark' ? 'dark' : ''} flex h-screen overflow-hidden font-sans theme-transition ${bgClass} ${textClass}`}>
@@ -255,58 +115,227 @@ const Layout: React.FC<LayoutProps> = ({
 
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
       {/* Sidebar - Mobile (Slide Over) & Desktop (Fixed/Collapsible) */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col border-r transform transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${theme === 'dark'
-          ? 'bg-[#0B0E16]/60 border-white/5 backdrop-blur-3xl shadow-[5px_0_30px_0_rgba(0,0,0,0.5)]'
-          : 'bg-white/50 border-white/20 backdrop-blur-3xl shadow-[5px_0_30px_0_rgba(0,0,0,0.05)]'
+        className={`fixed lg:static inset-y-0 left-0 z-50 flex flex-col border-r transform will-change-[width] ${theme === 'dark'
+          ? 'bg-[#020617] border-white/5 shadow-[10px_0_50px_0_rgba(0,0,0,0.7)]'
+          : 'bg-white/80 border-slate-200/60 backdrop-blur-2xl shadow-[5px_0_30px_0_rgba(0,0,0,0.03)]'
           } 
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} 
-        ${isSidebarCollapsed ? 'w-24' : 'w-80'}
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} 
+        ${isSidebarCollapsed ? 'w-24' : 'w-72'}
         `}
       >
-        {/* Glass Reflection / Noise Layer */}
-        <div className={`absolute inset-0 pointer-events-none z-0 ${theme === 'dark' ? 'bg-gradient-to-b from-white/[0.01] to-transparent' : 'bg-gradient-to-b from-white/40 to-transparent'}`}></div>
+        {/* --- ELITE BACKGROUND LAYERS --- */}
+        {/* Wrapped in overflow-hidden to prevent the large Radial Glow from bleeding out of the sidebar */}
+        <div className="absolute inset-0 overflow-hidden rounded-none z-0 pointer-events-none">
+          {/* 1. Deep Noise Texture (Dark Only) */}
+          {theme === 'dark' && (
+            <div className="absolute inset-0 opacity-[0.03] contrast-150 brightness-50 pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
+          )}
 
-        <div className="relative z-10 flex flex-col h-full">
-          <NavContent />
+          {/* 2. Radial Glow (Top Left) - "Ambient Light" */}
+          <div className={`absolute -top-20 -left-20 w-96 h-96 rounded-full blur-[100px] pointer-events-none z-0 transition-opacity duration-200 ${theme === 'dark' ? 'bg-brand-900/10 opacity-40' : 'bg-brand-50/60 opacity-50'}`}></div>
+
+          {/* 3. Bottom Gradient - "Grounding" */}
+          <div className={`absolute bottom-0 inset-x-0 h-64 bg-gradient-to-t pointer-events-none z-0 ${theme === 'dark' ? 'from-black/80 to-transparent' : 'from-slate-100/50 to-transparent'}`}></div>
         </div>
 
-        {/* Ambient Glow for Dark Mode Sidebar */}
-        {theme === 'dark' && (
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_0%_0%,rgba(2,6,23,0.4),transparent_50%)] pointer-events-none"></div>
-        )}
+        <div className="relative z-10 flex flex-col h-full">
+          {/* --- LOGO AREA --- */}
+          <div className={`relative z-10 flex flex-col items-center justify-center ${isSidebarCollapsed ? 'py-6' : 'py-8'}`}>
+            <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'space-x-4'}`}>
+
+              {/* Logo Container with "Reactor Core" Glow */}
+              <div className="relative group cursor-pointer">
+                <div className={`absolute inset-0 rounded-full bg-blue-500/30 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isSidebarCollapsed ? 'scale-150' : 'scale-125'}`}></div>
+                <img
+                  src="https://icgkbruoltgvchbqednf.supabase.co/storage/v1/object/public/logos/Logo%20Bsocial%20Icon%20new.png"
+                  alt="BSocial Logo"
+                  className={`relative z-10 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.15)] saturate-200 contrast-110 transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_25px_rgba(59,130,246,0.5)] ${isSidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`}
+                />
+              </div>
+
+              {!isSidebarCollapsed && (
+                <div className="flex flex-col opacity-0 animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
+                  <h1 className={`text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r ${theme === 'dark' ? 'from-white via-slate-200 to-slate-400' : 'from-slate-900 via-slate-700 to-slate-500'}`}>
+                    BSOCIAL
+                  </h1>
+                  <div className="flex items-center space-x-2">
+                    <div className="h-px w-3 bg-brand-500"></div>
+                    <p className={`text-[9px] font-bold uppercase tracking-[0.25em] ${theme === 'dark' ? 'text-brand-400' : 'text-brand-600'}`}>INTELLIGENCE</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* --- SEARCH / COMMAND --- */}
+          <div className={`px-4 mb-8 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
+            <button
+              onClick={() => setIsCommandOpen(true)}
+              className={`relative overflow-hidden group border transition-all duration-300 rounded-xl flex items-center
+            ${theme === 'dark'
+                  ? 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/10 text-slate-400'
+                  : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100 text-slate-500'
+                }
+            ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full justify-between py-2.5 px-3'}
+            shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]
+          `}
+            >
+              {/* Shimmer Effect on Hover */}
+              <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+
+              <div className="flex items-center justify-center relative z-10">
+                <Command size={16} className={`${isSidebarCollapsed ? '' : 'mr-3'} group-hover:text-brand-400 transition-colors`} />
+                {!isSidebarCollapsed && <span className="font-medium text-sm">Search</span>}
+              </div>
+              {!isSidebarCollapsed && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border opacity-50 ${theme === 'dark' ? 'bg-black/30 border-white/10' : 'bg-white border-slate-200'}`}>⌘K</span>
+              )}
+            </button>
+          </div>
+
+          {/* --- MENU ITEMS --- */}
+          <nav className={`flex-1 px-3 space-y-2 w-full flex flex-col items-center ${isSidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]'}`}>
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+
+              const activeClasses = theme === 'dark'
+                ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]'
+                : 'bg-gradient-to-r from-brand-50 to-transparent text-brand-700';
+
+              const inactiveClasses = theme === 'dark'
+                ? 'text-slate-400 hover:text-white hover:bg-white/5'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80';
+
+              const sharedClasses = `relative flex items-center transition-all duration-300 group rounded-xl
+            ${isActive ? activeClasses : inactiveClasses}
+            ${isSidebarCollapsed ? 'justify-center w-10 h-10 p-0' : 'w-full px-4 py-3'}
+          `;
+
+              const content = (
+                <>
+                  {/* Active Indicator Line (Left) */}
+                  {isActive && !isSidebarCollapsed && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-brand-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"></div>
+                  )}
+
+                  {/* Icon Container */}
+                  <div className={`relative flex items-center justify-center transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                    {isActive && (
+                      <div className="absolute inset-0 bg-brand-500/40 blur-[8px] rounded-full"></div>
+                    )}
+                    <Icon size={18} className={`relative z-10 ${isActive ? (theme === 'dark' ? 'text-brand-300' : 'text-brand-600') : ''}`} />
+                  </div>
+
+                  {!isSidebarCollapsed && (
+                    <span className={`ml-3 font-semibold tracking-wide text-sm ${isActive ? 'translate-x-1' : 'group-hover:translate-x-1'} transition-transform duration-300`}>
+                      {item.label}
+                    </span>
+                  )}
+
+                  {/* Tooltip for collapsed */}
+                  {isSidebarCollapsed && (
+                    <div className={`absolute left-14 z-50 px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none translate-x-2 group-hover:translate-x-0 border border-white/10 shadow-xl`}>
+                      {item.label}
+                      {/* Arrow */}
+                      <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45 border-l border-b border-white/10"></div>
+                    </div>
+                  )}
+                </>
+              );
+
+              if (navigationMode === 'router') {
+                return (
+                  <Link key={item.id} to={`/${item.id === 'dashboard' ? '' : item.id}`} className={sharedClasses} onClick={() => setIsSidebarOpen(false)}>
+                    {content}
+                  </Link>
+                );
+              }
+              return (
+                <button key={item.id} onClick={() => { onNavigate(item.id); setIsSidebarOpen(false); }} className={sharedClasses}>
+                  {content}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* --- FOOTER / CONTROL PAD --- */}
+          <div className={`p-4 mt-auto mb-2 w-full transition-all duration-300 ${isSidebarCollapsed ? 'items-center' : ''}`}>
+            <div className={`rounded-2xl p-2 flex flex-col gap-1 transition-all duration-300 ${isSidebarCollapsed ? 'bg-transparent' : (theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-slate-100/50 border border-slate-200')}`}>
+
+              {/* Manual Refresh */}
+              {onManualRefresh && (
+                <button onClick={onManualRefresh} title="Refresh Data" className={`flex items-center rounded-lg p-2 transition-all hover:bg-brand-500/10 hover:text-brand-500 ${isSidebarCollapsed ? 'justify-center' : ''} ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <RefreshCw size={16} className={`${!isSidebarCollapsed && 'mr-3'}`} />
+                  {!isSidebarCollapsed && <span className="text-xs font-semibold">Refresh System</span>}
+                </button>
+              )}
+
+              {/* Theme Toggle */}
+              <button onClick={onThemeToggle} title="Switch Theme" className={`flex items-center rounded-lg p-2 transition-all hover:bg-brand-500/10 hover:text-brand-500 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className="flex items-center">
+                  {theme === 'dark' ? <Moon size={16} className={!isSidebarCollapsed ? "mr-3 text-brand-300" : ""} /> : <Sun size={16} className={!isSidebarCollapsed ? "mr-3 text-orange-500" : ""} />}
+                  {!isSidebarCollapsed && <span className="text-xs font-semibold">{theme === 'dark' ? 'Dark Node' : 'Light Mode'}</span>}
+                </div>
+                {!isSidebarCollapsed && (
+                  <div className={`w-6 h-3 rounded-full relative transition-colors duration-300 ${theme === 'dark' ? 'bg-brand-600' : 'bg-slate-300'}`}>
+                    <div className={`absolute top-0.5 w-2 h-2 rounded-full bg-white transition-all duration-300 ${theme === 'dark' ? 'left-[calc(100%-10px)]' : 'left-0.5'}`}></div>
+                  </div>
+                )}
+              </button>
+
+              {/* Sign Out */}
+              <button onClick={onDisconnect} title="Sign Out" className={`mt-1 flex items-center rounded-lg p-2 transition-all hover:bg-red-500/10 hover:text-red-500 text-slate-400 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+                <LogOut size={16} className={`${!isSidebarCollapsed && 'mr-3'}`} />
+                {!isSidebarCollapsed && <span className="text-xs font-semibold">Sign Out</span>}
+              </button>
+
+            </div>
+          </div>
+        </div>
 
         {/* Floating Collapse Toggle - Glass Pill */}
         <button
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className={`hidden md:flex items-center justify-center absolute -right-3 top-24 z-50 w-6 h-6 rounded-full border shadow-lg backdrop-blur-md transition-all hover:scale-110 ${theme === 'dark'
+          className={`hidden lg:flex items-center justify-center absolute -right-3 top-24 z-50 w-6 h-6 rounded-full border shadow-lg backdrop-blur-md transition-all hover:scale-110 ${theme === 'dark'
             ? 'bg-slate-900/80 border-white/10 text-slate-400 hover:text-white hover:border-brand-500/50 shadow-black/50'
             : 'bg-white/80 border-white/60 text-slate-500 hover:text-brand-600 hover:border-brand-200 shadow-slate-200/50'
             }`}
         >
           {isSidebarCollapsed ? <ChevronRight size={10} /> : <ChevronLeft size={10} />}
         </button>
-      </aside>
+      </aside >
 
       {/* Main Content */}
-      <main className={`flex-1 flex flex-col relative overflow-hidden ${bgClass} w-full`}>
+      < main className={`flex-1 flex flex-col relative overflow-hidden ${bgClass} w-full`}>
 
         {/* Top Bar - Responsive */}
         {/* Top Bar - Native macOS Style Glass */}
-        <header className={`min-h-[5rem] flex flex-col md:flex-row items-center justify-between px-6 md:px-8 z-20 transition-all gap-4 py-3 sticky top-0 relative ${theme === 'dark'
-          ? 'bg-[#0B0E16]/50 border-b border-white/5 backdrop-blur-3xl supports-[backdrop-filter]:bg-[#0B0E16]/30'
-          : 'bg-white/90 border-b border-slate-200/60 backdrop-blur-3xl supports-[backdrop-filter]:bg-white/80 shadow-sm'
+        <header className={`min-h-[5rem] flex flex-col lg:flex-row items-center justify-between px-6 lg:px-8 z-20 transition-all gap-4 py-3 sticky top-0 relative ${theme === 'dark'
+          ? 'bg-[#020617]/80 border-b border-white/5 backdrop-blur-xl supports-[backdrop-filter]:bg-[#020617]/60 shadow-[0_4px_30px_rgba(0,0,0,0.5)]'
+          : 'bg-white/80 border-b border-slate-200/60 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 shadow-sm'
           }`}>
-          <div className="flex items-center w-full md:w-auto justify-between md:justify-start space-x-4 max-w-2xl flex-1">
+
+          {/* Elite Header Background Layers */}
+          {theme === 'dark' && (
+            <>
+              {/* Noise */}
+              <div className="absolute inset-0 opacity-[0.03] contrast-150 brightness-50 pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
+              {/* Subtle Top Highlight */}
+              <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+            </>
+          )}
+          <div className="flex items-center w-full lg:w-auto justify-between lg:justify-start space-x-4 max-w-2xl flex-1">
             <div className="flex items-center gap-3 w-full">
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="md:hidden p-2 -ml-2 text-slate-500 hover:text-brand-500 transition-colors"
+                className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-brand-500 transition-colors"
               >
                 <Menu size={24} />
               </button>
@@ -326,7 +355,7 @@ const Layout: React.FC<LayoutProps> = ({
             </div>
 
             {/* Date Selector moved here on Mobile */}
-            <div className="md:hidden">
+            <div className="lg:hidden">
               <DateRangeSelector
                 selection={dateSelection}
                 onChange={onDateChange}
@@ -347,7 +376,7 @@ const Layout: React.FC<LayoutProps> = ({
           )}
 
           {/* Desktop Date Selector Position */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-4">
             <DateRangeSelector
               selection={dateSelection}
               onChange={onDateChange}
@@ -358,8 +387,8 @@ const Layout: React.FC<LayoutProps> = ({
         </header>
 
         {/* Live Data Strip - Redesigned: 'Holographic Laser Line' */}
-        <div className={`w-full h-px relative flex items-center justify-center z-30 mt-6 mb-2 ${theme === 'dark' ? 'bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent' : 'bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent'}`}>
-          <div className={`absolute -top-3 px-3 py-1 rounded-full border shadow-[0_0_15px_rgba(16,185,129,0.2)] flex items-center gap-2 backdrop-blur-md ${theme === 'dark'
+        <div className={`w-full h-px relative flex items-center justify-center z-10 mt-6 mb-2 ${theme === 'dark' ? 'bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent' : 'bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent'}`}>
+          <div className={`absolute -top-3 px-3 py-1 rounded-full border shadow-[0_0_15px_rgba(16,185,129,0.2)] flex items-center gap-2 backdrop-blur-xl ${theme === 'dark'
             ? 'bg-[#0B0E16]/80 border-emerald-500/20 text-emerald-400'
             : 'bg-white/80 border-emerald-500/30 text-emerald-600'
             }`}>
@@ -380,13 +409,13 @@ const Layout: React.FC<LayoutProps> = ({
               {children}
             </div>
           ) : (
-            <div className="p-4 md:p-8 relative z-10 max-w-[1600px] mx-auto w-full">
+            <div className="p-4 lg:p-8 relative z-10 max-w-[1600px] mx-auto w-full">
               {children}
             </div>
           )}
         </div>
-      </main>
-    </div>
+      </main >
+    </div >
   );
 };
 

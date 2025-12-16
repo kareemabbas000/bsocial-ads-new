@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Sparkles, ChevronDown } from 'lucide-react';
 import { CreationWizard } from './components/CreationWizard/CreationWizard';
 import { CampaignStrategist } from './components/CampaignStrategist';
-import { fetchCampaignsWithInsights, fetchAdSetsWithInsights, fetchAdsWithInsights } from '../../services/metaService';
+import {
+    useCampaignsWithInsights,
+    useAdSetsWithInsights,
+    useAdsWithInsights
+} from '../../hooks/useMetaQueries';
 import { Campaign, AdSet, Ad, DateSelection, GlobalFilter, AccountHierarchy } from '../../types';
 import { AdsManagerProvider, useAdsManager } from './context/AdsManagerContext';
 import { AdsNavigator } from './components/AdsNavigator';
@@ -34,8 +38,6 @@ const AdsManagerContent: React.FC = () => {
         theme
     } = useAdsManager();
 
-    const [data, setData] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isAIStudioOpen, setAIStudioOpen] = useState(false);
     const [aiPrompt, setAiPrompt] = useState<string>('');
@@ -48,69 +50,81 @@ const AdsManagerContent: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
-    // View Cache for Instant Switching
-    const [viewCache, setViewCache] = useState<Record<string, any[]>>({});
+    // --- React Query Integration ---
+    const parentId = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].id : undefined;
 
-    const loadData = async () => {
-        if (!token || accountIds.length === 0) return;
+    // We use a shared options object for our queries
+    const queryOptions = React.useMemo(() => ({
+        // You can add refetchInterval here if passed from props context
+        refetchOnWindowFocus: false,
+    }), []); // Add dependencies if needed
 
-        // 1. Generate Cache Key
-        const parentId = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].id : 'root';
-        const cacheKey = `${currentLevel}-${parentId}-${dateSelection.preset || 'custom'}`;
+    // 1. Fetch Campaigns
+    const {
+        data: campaignsResp,
+        isLoading: loadingCampaigns
+    } = useCampaignsWithInsights(
+        accountIds,
+        token,
+        dateSelection,
+        filter || { searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] },
+        { ...queryOptions, enabled: currentLevel === 'CAMPAIGN' }
+    );
 
-        // 2. Check View Cache for Instant Render
-        const cached = viewCache[cacheKey];
-        if (cached) {
-            setData(cached);
-            setLoading(false);
-            return;
-        }
+    // 2. Fetch AdSets
+    const {
+        data: adSetsResp,
+        isLoading: loadingAdSets
+    } = useAdSetsWithInsights(
+        accountIds,
+        token,
+        dateSelection,
+        filter || { searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] },
+        parentId,
+        { ...queryOptions, enabled: currentLevel === 'ADSET' }
+    );
 
-        setLoading(true);
-        setData([]); // Clear data when loading new data (not from cache)
+    // 3. Fetch Ads
+    const {
+        data: adsResp,
+        isLoading: loadingAds
+    } = useAdsWithInsights(
+        accountIds,
+        token,
+        dateSelection,
+        filter || { searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] },
+        parentId,
+        { ...queryOptions, enabled: currentLevel === 'AD' }
+    );
 
-        try {
-            // Drill-down Logic
-            let response;
-            if (currentLevel === 'CAMPAIGN') {
-                response = await fetchCampaignsWithInsights(accountIds, token, dateSelection, filter);
-            } else if (currentLevel === 'ADSET') {
-                response = await fetchAdSetsWithInsights(accountIds, token, dateSelection, filter, parentId === 'root' ? undefined : parentId);
-            } else if (currentLevel === 'AD') {
-                response = await fetchAdsWithInsights(accountIds, token, dateSelection, filter, parentId === 'root' ? undefined : parentId);
-            }
+    // Unified Data & Loading
+    const data = React.useMemo(() => {
+        if (currentLevel === 'CAMPAIGN') return campaignsResp?.data || [];
+        if (currentLevel === 'ADSET') return adSetsResp?.data || [];
+        if (currentLevel === 'AD') return adsResp?.data || [];
+        return [];
+    }, [currentLevel, campaignsResp, adSetsResp, adsResp]);
 
-            if (response && response.data) {
-                setData(response.data);
-                // 3. Update Cache
-                setViewCache(prev => ({ ...prev, [cacheKey]: response.data }));
-            } else {
-                setData([]);
-            }
-        } catch (e) {
-            console.error("Failed to load ads data", e);
-            setData([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const loading = loadingCampaigns || loadingAdSets || loadingAds;
 
-    // Force clear cache on component MOUNT so fresh entry always shows SmartLoader
-    // But keep cache alive during tab switching (component stays mounted)
-    useEffect(() => {
-        setViewCache({});
-    }, []);
+    // TRACK INITIAL LOAD: Only show Smart Loader once per session
+    // Use REF to track this across renders immediately
+    const initialLoadRef = React.useRef(false);
 
-    useEffect(() => {
-        loadData();
-    }, [token, accountIds, dateSelection, filter, currentLevel, breadcrumbs, refreshTrigger]);
+    // Check if we have data NOW
+    const hasData = (campaignsResp?.data?.length || 0) > 0 ||
+        (adSetsResp?.data?.length || 0) > 0 ||
+        (adsResp?.data?.length || 0) > 0;
+
+    if (hasData) {
+        initialLoadRef.current = true;
+    }
 
     // Reset pagination on filter/level change
     useEffect(() => {
         setLimit(25);
     }, [currentLevel, searchQuery, sortConfig]);
 
-    // Apply Local Search & Sort
     const processedData = React.useMemo(() => {
         let result = [...data];
 
@@ -126,13 +140,13 @@ const AdsManagerContent: React.FC = () => {
         // Sort
         if (sortConfig) {
             result.sort((a, b) => {
-                let aVal: any = a[sortConfig.key];
-                let bVal: any = b[sortConfig.key];
+                let aVal: any = (a as any)[sortConfig.key];
+                let bVal: any = (b as any)[sortConfig.key];
 
                 // Handle nested insights for sorting
                 if (['spend', 'impressions', 'reach', 'cpm', 'cpc', 'ctr'].includes(sortConfig.key)) {
-                    aVal = a.insights?.[sortConfig.key] || 0;
-                    bVal = b.insights?.[sortConfig.key] || 0;
+                    aVal = (a as any).insights?.[sortConfig.key] || 0;
+                    bVal = (b as any).insights?.[sortConfig.key] || 0;
 
                     // Numeric parsing for insights
                     if (typeof aVal === 'string') aVal = parseFloat(aVal);
@@ -140,8 +154,8 @@ const AdsManagerContent: React.FC = () => {
                 }
 
                 if (sortConfig.key === 'results') {
-                    aVal = parseInt(a.insights?.actions?.[0]?.value || '0');
-                    bVal = parseInt(b.insights?.actions?.[0]?.value || '0');
+                    aVal = parseInt((a as any).insights?.actions?.[0]?.value || '0');
+                    bVal = parseInt((b as any).insights?.actions?.[0]?.value || '0');
                 }
 
                 if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -157,11 +171,10 @@ const AdsManagerContent: React.FC = () => {
     const hasMore = limit < processedData.length;
 
     // SMART LOADER (Restored per user request for "Attractive" Initial Load)
-    // Only block if we have NO data to show AND it is the very first load (ViewCache empty)
-    // This ensures tab switching uses the table skeleton (native feel) instead of blocking.
-    const isFirstLoad = Object.keys(viewCache).length === 0;
+    // Only block if we have NO data to show AND it is the very first load.
+    // Subsequent navigations (drill-down) should use the table skeleton.
 
-    if (loading && data.length === 0 && isFirstLoad) {
+    if (loading && !initialLoadRef.current && !hasData) {
         return (
             <div className="h-full relative bg-slate-50 dark:bg-slate-950">
                 <SmartLoader

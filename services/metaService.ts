@@ -391,14 +391,18 @@ export const fetchAdSetsWithInsights = async (
     token: string,
     dateSelection: DateSelection,
     filter?: GlobalFilter,
-    afterCursor?: string
+    parentId?: string
 ): Promise<PaginatedResponse<AdSet>> => {
-    const cacheKey = generateKey('fetchAdSetsWithInsights', adAccountIds, dateSelection, filter, afterCursor);
+    const cacheKey = generateKey('fetchAdSetsWithInsights', adAccountIds, dateSelection, filter, parentId);
     const cached = getCache(cacheKey);
     if (cached) return cached as PaginatedResponse<AdSet>;
 
-    const promises = adAccountIds.map(async (accId) => {
-        const formattedId = accId.startsWith('act_') ? accId : `act_${accId}`;
+    const promises = (parentId ? [parentId] : adAccountIds).map(async (id) => {
+        // If parentId provided, use it directly (no 'act_' prefix unless it's an account ID which it isn't here)
+        // If accountId, ensure 'act_' prefix
+        const isAccount = !parentId;
+        const formattedId = isAccount && !id.startsWith('act_') ? `act_${id}` : id;
+
         const filtering = buildFilteringParam(filter);
 
         let timeFilter = '';
@@ -446,7 +450,7 @@ export const fetchAdSetsWithInsights = async (
                 };
             });
         } catch (e) {
-            console.error(`Fetch adsets failed for ${accId}`, e);
+            console.error(`Fetch adsets failed for ${id}`, e);
             return [];
         }
     });
@@ -464,54 +468,163 @@ export const fetchAdsWithInsights = async (
     token: string,
     dateSelection: DateSelection,
     filter?: GlobalFilter,
-    afterCursor?: string
+    parentId?: string
 ): Promise<PaginatedResponse<Ad>> => {
-    const cacheKey = generateKey('fetchAdsWithInsights', adAccountIds, dateSelection, filter, afterCursor);
+    const cacheKey = generateKey('fetchAdsWithInsights', adAccountIds, dateSelection, filter, parentId);
     const cached = getCache(cacheKey);
     if (cached) return cached as PaginatedResponse<Ad>;
 
-    const promises = adAccountIds.map(async (accId) => {
-        const formattedId = accId.startsWith('act_') ? accId : `act_${accId}`;
-        const filtering = buildFilteringParam(filter);
+    // STEP 1: Fetch ALL Ad IDs first (using pagination)
+    // This is lightweight and avoids timeouts compared to fetching full insights for 500+ ads at once.
+    const allAdIds: { id: string, accountId: string }[] = [];
 
-        let timeFilter = '';
-        if (dateSelection.preset !== 'custom' && ['today', 'yesterday', 'last_7d', 'last_30d', 'this_month', 'last_month', 'this_year', 'maximum'].includes(dateSelection.preset)) {
-            timeFilter = `.date_preset(${dateSelection.preset})`;
-        } else {
-            const { since, until } = resolveDateRange(dateSelection);
-            const range = JSON.stringify({ since, until });
-            timeFilter = `.time_range(${range})`;
-        }
+    // We process each account/parent target
+    const targets = parentId ? [parentId] : adAccountIds;
 
-        const fields = `id,adset_id,campaign_id,name,status,creative{id},campaign{objective},insights${timeFilter}{spend,impressions,clicks,unique_clicks,cpc,ctr,cpm,reach,frequency,inline_link_clicks,inline_post_engagement,actions,action_values,outbound_clicks,video_play_actions,video_p100_watched_actions,video_thruplay_watched_actions,purchase_roas}`;
+    // Helper to fetch IDs recursively
+    const fetchIdsForTarget = async (targetId: string) => {
+        const isAccount = !parentId;
+        const formattedId = isAccount && !targetId.startsWith('act_') ? `act_${targetId}` : targetId;
 
-        // Robust encoding
+        // Only Search Filter applies to ID fetching step if needed, or we filter later?
+        // Better to fetch all IDs and filter in step 2 or let API filter by name if simple.
+        // For simplicity/robustness, fetch all IDs in the container (active/paused etc)
+
         const statusArr = ["ACTIVE", "PAUSED", "ARCHIVED", "IN_PROCESS", "WITH_ISSUES"];
         const statusParam = `&effective_status=${encodeURIComponent(JSON.stringify(statusArr))}`;
 
-        try {
-            const response = await fetch(
-                `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/ads?fields=${fields}&limit=1000${statusParam}&access_token=${token}${filtering}&use_account_attribution_setting=true`
-            );
-            const data = await response.json();
-            return data.data || [];
-        } catch (e) {
-            console.error(`Fetch ads failed for ${accId}`, e);
-            return [];
+        // Drill-down search support
+        const safeFilter: GlobalFilter = parentId ? {
+            searchQuery: filter?.searchQuery || '',
+            selectedCampaignIds: [],
+            selectedAdSetIds: []
+        } : (filter || { searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] });
+
+        const filtering = buildFilteringParam(safeFilter);
+
+        let url = `${BASE_URL}/${GRAPH_API_VERSION}/${formattedId}/ads?fields=id,creative&limit=500${statusParam}&access_token=${token}${filtering}`;
+
+
+
+        let hasNext = true;
+        while (hasNext) {
+            try {
+                const res = await fetch(url);
+                const json = await res.json();
+                if (json.error) {
+                    console.error('[Meta API] ID Fetch Error:', json.error);
+                    break;
+                }
+                const items = json.data || [];
+                items.forEach((item: any) => allAdIds.push({ id: item.id, accountId: targetId }));
+
+                if (json.paging?.next) {
+                    url = json.paging.next;
+                } else {
+                    hasNext = false;
+                }
+            } catch (e) {
+                console.error('[Meta API] ID Fetch Exception:', e);
+                hasNext = false;
+            }
         }
-    });
+    };
 
-    const rawAdsLists = await Promise.all(promises);
-    const adsRaw = rawAdsLists.flat();
+    await Promise.all(targets.map(fetchIdsForTarget));
 
-    // --- ENHANCED CREATIVE FETCHING (Batching all ID from all accounts) ---
-    const creativeIds = [...new Set(adsRaw.map((a: any) => a.creative?.id).filter(Boolean))];
+    if (allAdIds.length === 0) {
+        return { data: [], next: undefined };
+    }
+
+    // STEP 2: Batch Fetch Details & Insights
+    // Meta recommends batching requests or using `?ids=...`
+    const processedAds: Ad[] = [];
+    const chunkSize = 50; // Safe size for heavy fields
+    const chunks = [];
+
+    for (let i = 0; i < allAdIds.length; i += chunkSize) {
+        chunks.push(allAdIds.slice(i, i + chunkSize));
+    }
+
+    // Prepare time range for insights
+    let timeFilter = '';
+    if (dateSelection.preset !== 'custom' && ['today', 'yesterday', 'last_7d', 'last_30d', 'this_month', 'last_month', 'this_year', 'maximum'].includes(dateSelection.preset)) {
+        timeFilter = `.date_preset(${dateSelection.preset})`;
+    } else {
+        const { since, until } = resolveDateRange(dateSelection);
+        const range = JSON.stringify({ since, until });
+        timeFilter = `.time_range(${range})`;
+    }
+
+    const fields = `id,adset_id,campaign_id,name,status,creative{id},campaign{objective},insights${timeFilter}{spend,impressions,clicks,unique_clicks,cpc,ctr,cpm,reach,frequency,inline_link_clicks,inline_post_engagement,actions,action_values,outbound_clicks,video_play_actions,video_p100_watched_actions,video_thruplay_watched_actions,purchase_roas}`;
+
+    // Function to process a chunk
+    const processChunk = async (chunk: { id: string }[]) => {
+        const ids = chunk.map(c => c.id).join(',');
+        const url = `${BASE_URL}/${GRAPH_API_VERSION}/?ids=${ids}&fields=${fields}&access_token=${token}&use_account_attribution_setting=true`;
+
+        try {
+            const res = await fetch(url);
+            const json = await res.json();
+
+            // Result is a dictionary: { "id1": { ... }, "id2": { ... } }
+            // Some IDs might fail individually but usually it returns valid objects
+            Object.values(json).forEach((ad: any) => {
+                // Reuse processing logic
+                const insights = ad.insights ? ad.insights.data[0] : null;
+                let enhancedInsights = null;
+                if (insights) {
+                    const videoPlays = insights.video_play_actions?.find((a: any) => a.action_type === 'video_view')?.value || '0';
+                    const thruPlays = insights.video_thruplay_watched_actions?.find((a: any) => a.action_type === 'video_thruplay')?.value || '0';
+                    const objective = ad.campaign?.objective || 'UNKNOWN';
+                    const { results, cost_per_result } = calculateResults(insights, objective);
+
+                    enhancedInsights = {
+                        ...insights,
+                        video_plays: videoPlays,
+                        video_thruplays: thruPlays,
+                        results: results.toString(),
+                        cost_per_result: cost_per_result.toFixed(2),
+                        roas: calculateROAS(insights)
+                    };
+                }
+                processedAds.push({
+                    ...ad,
+                    // Creative will be merged later or we let regular flow handle it?
+                    // Wait, fetchCreative is separate below in original code.
+                    // IMPORTANT: The original code fetched 'creativeIds' from 'adsRaw' which was the result of the big fetch.
+                    // Now 'processedAds' is that result.
+
+                    // Temporarily undefined creative, will be populated by the dedicated creative fetcher if we keep it,
+                    // BUT wait, we requested `creative{id}` in fields above. So ad.creative.id is available here.
+                    creative: { id: ad.creative?.id } as any, // Placeholder 
+                    insights: enhancedInsights
+                });
+            });
+
+        } catch (e) {
+            console.error('[Meta API] Batch Fetch Error:', e);
+        }
+    };
+
+    // Run chunk fetches in parallel (limited wrapper?)
+    // Promise.all for all chunks might still be heavy if 5000 ads -> 100 requests.
+    // But 500 ads -> 10 requests. Totally fine.
+    await Promise.all(chunks.map(processChunk));
+
+    // --- ENHANCED CREATIVE FETCHING (Retain existing Logic) ---
+    // Now we have processedAds. We need to fetch full creative details.
+    const creativeIds = [...new Set(processedAds.map((a: any) => a.creative?.id).filter(Boolean))];
     const creativeMap: Record<string, AdCreative> = {};
 
     if (creativeIds.length > 0) {
-        const chunkSize = 50;
-        for (let i = 0; i < creativeIds.length; i += chunkSize) {
-            const chunk = creativeIds.slice(i, i + chunkSize);
+        const cChunkSize = 50;
+        const cChunks = [];
+        for (let i = 0; i < creativeIds.length; i += cChunkSize) {
+            cChunks.push(creativeIds.slice(i, i + cChunkSize));
+        }
+
+        await Promise.all(cChunks.map(async (chunk) => {
             try {
                 const creFields = 'id,name,title,body,image_url,thumbnail_url,object_story_spec,asset_feed_spec,call_to_action_type,image_hash,effective_object_story_id,object_type,instagram_actor_id';
                 const creResponse = await fetch(
@@ -539,37 +652,15 @@ export const fetchAdsWithInsights = async (
             } catch (e) {
                 console.error(`Fetch creative chunk failed`, e);
             }
-        }
+        }));
     }
 
-    const processedAds = adsRaw.map((ad: any) => {
-        const insights = ad.insights ? ad.insights.data[0] : null;
-        let enhancedInsights = null;
-        if (insights) {
-            const videoPlays = insights.video_play_actions?.find((a: any) => a.action_type === 'video_view')?.value || '0';
-            const thruPlays = insights.video_thruplay_watched_actions?.find((a: any) => a.action_type === 'video_thruplay')?.value || '0';
-            const actions = insights.actions || [];
-            // Use calculateResults
-            const objective = ad.campaign?.objective || 'UNKNOWN';
-            const { results, cost_per_result } = calculateResults(insights, objective);
+    const finalAds = processedAds.map(ad => ({
+        ...ad,
+        creative: ad.creative?.id ? creativeMap[ad.creative.id] : undefined
+    }));
 
-            enhancedInsights = {
-                ...insights,
-                video_plays: videoPlays,
-                video_thruplays: thruPlays,
-                results: results.toString(),
-                cost_per_result: cost_per_result.toFixed(2),
-                roas: calculateROAS(insights)
-            };
-        }
-        return {
-            ...ad,
-            creative: ad.creative ? creativeMap[ad.creative.id] : undefined,
-            insights: enhancedInsights
-        };
-    });
-
-    const response = { data: processedAds, nextCursor: undefined };
+    const response = { data: finalAds, next: undefined };
     setCache(cacheKey, response);
     return response;
 };

@@ -1,13 +1,12 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { fetchCreativePerformance } from '../services/metaService';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useCreativePerformance } from '../hooks/useMetaQueries';
 import { analyzeCreative } from '../services/aiService';
 import { AdPerformance, DateSelection, Theme, AdCreative, GlobalFilter, UserConfig } from '../types';
 import LoadingSpinner from '../components/LoadingSpinner'; // Unified Loading
 import {
     Image, Sparkles, LayoutGrid, List, X, ExternalLink,
-    Video, Layers, Zap, ChevronDown, SlidersHorizontal, ArrowLeftRight,
-    ArrowUp, ArrowDown, ArrowUpDown, SortAsc, SortDesc, Crown, TrendingUp, AlertTriangle, Check, GripHorizontal,
-    ZoomIn, ZoomOut, Trash2, Save, Undo, Redo, RotateCcw
+    ChevronDown, SlidersHorizontal, ArrowUp, ArrowDown, SortAsc, SortDesc, Crown, AlertTriangle, Check, GripHorizontal,
+    ZoomIn, ZoomOut
 } from 'lucide-react';
 import { CreativeList } from './AdsManager/components/CreativeList';
 
@@ -21,6 +20,7 @@ interface CreativeHubProps {
     refreshInterval?: number;
     refreshTrigger?: number;
 }
+
 
 // Available Metrics Definition with Categories
 const AVAILABLE_METRICS = [
@@ -200,10 +200,18 @@ const MetricsCarousel: React.FC<{
 };
 
 const CreativeHub: React.FC<CreativeHubProps> = ({ token, accountIds, datePreset, theme, filter, userConfig, refreshInterval = 10, refreshTrigger = 0 }) => {
-    const [ads, setAds] = useState<AdPerformance[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    // TanStack Query Hook
+    const { data: ads = [], isLoading: loading } = useCreativePerformance(
+        accountIds,
+        token,
+        datePreset,
+        filter,
+        {
+            refetchInterval: refreshInterval > 0 ? refreshInterval * 60 * 1000 : false,
+        }
+    );
 
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set(['spend', 'reach', 'impressions', 'clicks', 'ctr', 'post_engagement', 'roas']));
     const [metricOrder, setMetricOrder] = useState<string[]>(AVAILABLE_METRICS.map(m => m.id));
     const [showMetricsPanel, setShowMetricsPanel] = useState(false);
@@ -217,6 +225,11 @@ const CreativeHub: React.FC<CreativeHubProps> = ({ token, accountIds, datePreset
     const [selectedAd, setSelectedAd] = useState<AdPerformance | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+
+    // Reset display count on filter change (mimics original behavior)
+    useEffect(() => {
+        setDisplayCount(12);
+    }, [accountIds, datePreset, filter]);
 
     // Refs for Click Outside
     const sortPanelRef = React.useRef<HTMLDivElement>(null);
@@ -323,30 +336,7 @@ const CreativeHub: React.FC<CreativeHubProps> = ({ token, accountIds, datePreset
     const disableTags = userConfig?.disable_creative_tags || false;
     const disableAI = userConfig?.disable_ai || false;
 
-    useEffect(() => {
-        const load = async (isBackground = false) => {
-            // Stale-While-Revalidate: Only show spinner if we have NO data
-            if (ads.length === 0 && !isBackground) setLoading(true);
-            try {
-                const data = await fetchCreativePerformance(accountIds, token, datePreset, filter);
-                setAds(data);
-                if (!isBackground) setDisplayCount(12);
-            } catch (e) {
-                console.error(e);
-            } finally {
-                if (!isBackground) setLoading(false);
-            }
-        };
-        load();
-
-        // Auto-Refresh
-        if (refreshInterval && refreshInterval > 0) {
-            const interval = setInterval(() => {
-                load(true);
-            }, refreshInterval * 60 * 1000);
-            return () => clearInterval(interval);
-        }
-    }, [accountIds, datePreset, filter, refreshInterval, refreshTrigger]);
+    // OLD DATA FETCHING REMOVED
 
     const getMetricValue = (ad: AdPerformance, metricId: string) => {
         const rawSpend = parseFloat(ad.spend || '0');

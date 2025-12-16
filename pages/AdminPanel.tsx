@@ -27,6 +27,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
     const [metaToken, setMetaToken] = useState('');
     const [enableGoogleAuth, setEnableGoogleAuth] = useState(true);
     const [enableRouter, setEnableRouter] = useState(false);
+    const [enableManualRefresh, setEnableManualRefresh] = useState(false);
 
     // Modal States
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -50,16 +51,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [usersData, token, googleAuth, routerEnabled] = await Promise.all([
+            const [usersData, token, googleAuth, routerEnabled, manualRefreshEnabled] = await Promise.all([
                 fetchAllUsers(),
                 fetchSystemSetting('meta_token'),
                 fetchSystemSetting('enable_google_auth'),
-                fetchSystemSetting('enable_react_router')
+                fetchSystemSetting('enable_react_router'),
+                fetchSystemSetting('enable_manual_refresh')
             ]);
             setUsers(usersData);
             setMetaToken(token || '');
             if (googleAuth !== null) setEnableGoogleAuth(googleAuth !== 'false');
             if (routerEnabled !== null) setEnableRouter(routerEnabled === 'true');
+            if (manualRefreshEnabled !== null) setEnableManualRefresh(manualRefreshEnabled === 'true');
             if (token) fetchAccounts(token);
         } catch (e) {
             console.error(e);
@@ -124,6 +127,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
         } catch (e) {
             setEnableRouter(!newValue);
             showNotification('error', "Failed to update Router setting");
+        }
+    };
+
+    const handleToggleManualRefresh = async () => {
+        const newValue = !enableManualRefresh;
+        setEnableManualRefresh(newValue);
+        try {
+            await updateSystemSetting('enable_manual_refresh', String(newValue));
+            showNotification('success', `Manual Refresh ${newValue ? 'Enabled' : 'Disabled'} - Please Refresh`);
+        } catch (e) {
+            setEnableManualRefresh(!newValue);
+            showNotification('error', "Failed to update Manual Refresh setting");
         }
     };
 
@@ -254,6 +269,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ theme }) => {
                 toggleGoogleAuth={handleToggleGoogleAuth}
                 enableRouter={enableRouter}
                 toggleRouter={handleToggleRouter}
+                enableManualRefresh={enableManualRefresh}
+                toggleManualRefresh={handleToggleManualRefresh}
                 onSaveToken={handleSaveToken}
             />
 

@@ -29,23 +29,22 @@ const RouterApp: React.FC<{
   setFilter: (f: GlobalFilter) => void;
   accountNames: string[];
   handleManualRefresh: () => void;
+  enableManualRefresh: boolean; // New Prop
   dateSelection: DateSelection;
   setDateSelection: (d: DateSelection) => void;
   loading: boolean;
 }> = ({
   appProps, theme, toggleTheme, handleDisconnect, hierarchy, filter, setFilter,
-  accountNames, handleManualRefresh, dateSelection, setDateSelection, loading
+  accountNames, handleManualRefresh, enableManualRefresh, dateSelection, setDateSelection, loading
 }) => {
     const location = useLocation();
     const activeTab = location.pathname.substring(1) || 'dashboard';
     const { appState, allowedFeatures, isDateLocked, isFilterLocked, refreshInterval, refreshTrigger } = appProps;
 
-    // Sync Global Filter updates to URL? (Optional enhancement later)
+    // ... (rest of logic same)
 
     // Guard: Connection Wait
     if (!appState.metaToken && activeTab !== 'admin' && activeTab !== 'login') {
-      // Allow admin route to render? No, admin panel is inside layout.
-      // If we are just loading token, show spinner.
       return <LoadingSpinner theme={theme} message="Connecting to Meta..." />;
     }
 
@@ -64,12 +63,10 @@ const RouterApp: React.FC<{
       userConfig: appState.userConfig,
       refreshInterval,
       refreshTrigger,
-      // Add for specific components if needed
       hierarchy
     };
 
     const hasAccess = (feature: string) => {
-      // Admin has access to everything
       if (appState.userRole === 'admin') return true;
       const allowed = appState.userConfig?.allowed_features || [];
       return allowed.includes(feature);
@@ -99,7 +96,7 @@ const RouterApp: React.FC<{
         allowedFeatures={allowedFeatures}
         isDateLocked={isDateLocked}
         accountNames={accountNames}
-        onManualRefresh={handleManualRefresh}
+        onManualRefresh={enableManualRefresh ? handleManualRefresh : undefined}
         hideAccountName={appState.userConfig?.hide_account_name}
       >
         <Routes>
@@ -119,6 +116,18 @@ const RouterApp: React.FC<{
     );
   };
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Prevent aggressive refetching
+      retry: 1, // Limited retries
+    },
+  },
+});
+
 const App: React.FC = () => {
   // ... existing state
   const [session, setSession] = useState<any>(null);
@@ -130,6 +139,7 @@ const App: React.FC = () => {
 
   // New: Feature Flag
   const [enableRouter, setEnableRouter] = useState(false);
+  const [enableManualRefresh, setEnableManualRefresh] = useState(false); // New State
 
   // ... (keep all existing state: activeTab, dateSelection, theme, etc.)
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -184,7 +194,6 @@ const App: React.FC = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      // Prevent App re-render if token hasn't changed (e.g. tab focus event with same session)
       setSession((prev: Session | null) => {
         if (prev?.access_token === session?.access_token) return prev;
         return session;
@@ -196,13 +205,11 @@ const App: React.FC = () => {
         }
       } else {
         setAppState({ metaToken: null, adAccountIds: [], isConnected: false });
-        // Clear sensitive data
         setHierarchy({ campaigns: [], adSets: [], ads: [] });
         setAccountNames([]);
         setFilter({ searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] });
         setLoading(false);
 
-        // Reset URL to root on logout to match standard SaaS UX
         if (typeof window !== 'undefined' && window.location.pathname !== '/') {
           window.history.replaceState(null, '', '/');
         }
@@ -216,25 +223,27 @@ const App: React.FC = () => {
       setLoading(true);
     }
     try {
-      const [profile, config, token, routerEnabled] = await Promise.all([
+      const [profile, config, token, routerEnabled, manualRefreshEnabled] = await Promise.all([
         fetchUserProfile(userId),
         fetchUserConfig(userId),
         fetchSystemSetting('meta_token'),
-        fetchSystemSetting('enable_react_router') // Fetch Flag
+        fetchSystemSetting('enable_react_router'),
+        fetchSystemSetting('enable_manual_refresh')
       ]);
 
       if (routerEnabled !== null) {
         setEnableRouter(routerEnabled === 'true');
       }
+      if (manualRefreshEnabled !== null) {
+        setEnableManualRefresh(manualRefreshEnabled === 'true');
+      }
 
       if ((!profile || !config) && retryCount < 3) {
-        // ... retry logic
         console.warn(`Fetch failed. Retrying... (${retryCount + 1}/3)`);
         setTimeout(() => initializeUser(userId, retryCount + 1), 500);
         return;
       }
 
-      // ... (existing initialization logic) ...
       if (token && config && config.ad_account_ids.length > 0) {
         setAppState({
           metaToken: token,
@@ -244,19 +253,16 @@ const App: React.FC = () => {
           userConfig: config
         });
 
-        // ... (check onboarding) ...
         if (!profile?.company || profile.company === 'Default Organization') {
           setAppState(prev => ({ ...prev, needsOnboarding: true }));
         } else {
           setAppState(prev => ({ ...prev, needsOnboarding: false }));
         }
 
-        // Fetch Accounts
         try {
           const allAccounts = await fetchAdAccounts(token);
           const names = allAccounts
             .filter(acc => {
-              // Robust ID matching: handle 'act_' prefix mismatch
               const accIdClean = acc.id.replace('act_', '');
               const configIdsClean = config.ad_account_ids.map(id => id.replace('act_', ''));
               return configIdsClean.includes(accIdClean);
@@ -267,10 +273,8 @@ const App: React.FC = () => {
           console.error(e);
         }
 
-        // Set Theme
         if (config.theme) setTheme(config.theme);
       } else {
-        // ... non-connected state logic ...
         setAppState(prev => ({
           ...prev,
           metaToken: token,
@@ -278,7 +282,6 @@ const App: React.FC = () => {
           userRole: profile?.role,
           userConfig: config || undefined
         }));
-        // ... onboarding logic ...
         if (!profile?.company || profile.company === 'Default Organization') {
           setAppState(prev => ({ ...prev, needsOnboarding: true }));
         } else {
@@ -287,7 +290,6 @@ const App: React.FC = () => {
         if (config?.theme) setTheme(config.theme);
       }
 
-      // Config Apply
       if (config?.fixed_date_start && config?.fixed_date_end) {
         setDateSelection({
           preset: 'custom',
@@ -295,7 +297,6 @@ const App: React.FC = () => {
         });
       }
 
-      // Allowed Sections & Redirect (Logic mostly relevant for legacy state mode)
       const allowed = config?.allowed_features || ['dashboard', 'campaigns', 'ads-hub', 'ai-lab'];
       if (profile?.role !== 'admin' && !allowed.includes('dashboard') && allowed.length > 0) {
         if (activeTab === 'dashboard' && !allowed.includes('dashboard')) {
@@ -314,7 +315,6 @@ const App: React.FC = () => {
     }
   };
 
-  // ... (keep useEffect for hierarchy)
   useEffect(() => {
     if (appState.isConnected && appState.metaToken && appState.adAccountIds.length > 0) {
       const loadHierarchy = async () => {
@@ -325,7 +325,6 @@ const App: React.FC = () => {
     }
   }, [appState.isConnected, appState.adAccountIds, appState.metaToken, refreshTrigger]);
 
-  // ... (keep handleDisconnect, toggleTheme, handleManualRefresh)
   const handleDisconnect = async () => {
     try { await supabase.auth.signOut(); } catch (e) { console.error(e); }
     setSession(null);
@@ -333,6 +332,7 @@ const App: React.FC = () => {
     setHierarchy({ campaigns: [], adSets: [], ads: [] });
     setAccountNames([]);
     setFilter({ searchQuery: '', selectedCampaignIds: [], selectedAdSetIds: [] });
+    setLoading(false);
   };
 
   const toggleTheme = async () => {
@@ -361,18 +361,22 @@ const App: React.FC = () => {
 
   const handleManualRefresh = () => {
     clearCache();
+    queryClient.invalidateQueries();
     if (appState.isConnected && appState.metaToken) {
       fetchAdAccounts(appState.metaToken).then(() => { });
     }
     setRefreshTrigger(prev => prev + 1);
   };
 
-  // Rendering
   if (loading) return <LoadingSpinner theme={theme} message="Initializing ADHub..." />;
   if (!session) return <Login theme={theme} />;
 
   if (appState.needsOnboarding) {
-    return <Onboarding session={session} onComplete={() => handleManualRefresh()} />;
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Onboarding session={session} onComplete={() => handleManualRefresh()} />
+      </QueryClientProvider>
+    );
   }
 
   // --- ROUTER MODE RENDER ---
@@ -382,7 +386,6 @@ const App: React.FC = () => {
     const isFilterLocked = !!(appState.userConfig?.global_campaign_filter && appState.userConfig.global_campaign_filter.length > 0);
     const refreshInterval = appState.userConfig?.refresh_interval || 10;
 
-    // Pack props
     const appProps = {
       appState,
       allowedFeatures,
@@ -393,58 +396,62 @@ const App: React.FC = () => {
     };
 
     return (
-      <BrowserRouter>
-        <RouterApp
-          appProps={appProps}
-          theme={theme}
-          toggleTheme={toggleTheme}
-          handleDisconnect={handleDisconnect}
-          hierarchy={hierarchy}
-          filter={filter}
-          setFilter={setFilter}
-          accountNames={accountNames}
-          handleManualRefresh={handleManualRefresh}
-          dateSelection={dateSelection}
-          setDateSelection={setDateSelection}
-          loading={loading}
-        />
-      </BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <RouterApp
+            appProps={appProps}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            handleDisconnect={handleDisconnect}
+            hierarchy={hierarchy}
+            filter={filter}
+            setFilter={setFilter}
+            accountNames={accountNames}
+            handleManualRefresh={handleManualRefresh}
+            enableManualRefresh={enableManualRefresh}
+            dateSelection={dateSelection}
+            setDateSelection={setDateSelection}
+            loading={loading}
+          />
+        </BrowserRouter>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
     );
   }
 
   // --- LEGACY STATE MODE RENDER ---
   if (appState.userRole === 'admin' && activeTab === 'admin') {
-    // ...
     return (
-      <Layout
-        activeTab={activeTab}
-        onNavigate={setActiveTab}
-        onDisconnect={handleDisconnect}
-        dateSelection={dateSelection}
-        onDateChange={setDateSelection}
-        theme={theme}
-        onThemeToggle={toggleTheme}
-        hierarchy={hierarchy}
-        filter={filter}
-        onFilterChange={setFilter}
-        userRole={appState.userRole}
-        accountNames={accountNames}
-        onManualRefresh={handleManualRefresh}
-        allowedFeatures={appState.userConfig?.allowed_features}
-      >
-        <AdminPanel theme={theme} />
-      </Layout>
+      <QueryClientProvider client={queryClient}>
+        <Layout
+          activeTab={activeTab}
+          onNavigate={setActiveTab}
+          onDisconnect={handleDisconnect}
+          dateSelection={dateSelection}
+          onDateChange={setDateSelection}
+          theme={theme}
+          onThemeToggle={toggleTheme}
+          hierarchy={hierarchy}
+          filter={filter}
+          onFilterChange={setFilter}
+          userRole={appState.userRole}
+          accountNames={accountNames}
+          onManualRefresh={enableManualRefresh ? handleManualRefresh : undefined}
+          allowedFeatures={appState.userConfig?.allowed_features}
+        >
+          <AdminPanel theme={theme} />
+        </Layout>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
     );
   }
 
-  // ... (keep permission data extraction for legacy)
   const allowedFeatures = appState.userConfig?.allowed_features;
   const isDateLocked = !!(appState.userConfig?.fixed_date_start && appState.userConfig?.fixed_date_end);
   const isFilterLocked = !!(appState.userConfig?.global_campaign_filter && appState.userConfig.global_campaign_filter.length > 0);
   const refreshInterval = appState.userConfig?.refresh_interval || 10;
 
   const renderContent = () => {
-    // ... (logic remains same as original)
     const allowed = allowedFeatures || [];
 
     if (!appState.metaToken && activeTab !== 'admin') {
@@ -522,26 +529,29 @@ const App: React.FC = () => {
   }
 
   return (
-    <Layout
-      activeTab={activeTab}
-      onNavigate={setActiveTab}
-      onDisconnect={handleDisconnect}
-      dateSelection={dateSelection}
-      onDateChange={setDateSelection}
-      theme={theme}
-      onThemeToggle={toggleTheme}
-      hierarchy={hierarchy}
-      filter={filter}
-      onFilterChange={setFilter}
-      userRole={appState.userRole}
-      allowedFeatures={allowedFeatures}
-      isDateLocked={isDateLocked}
-      accountNames={accountNames}
-      onManualRefresh={handleManualRefresh}
-      hideAccountName={appState.userConfig?.hide_account_name}
-    >
-      {React.cloneElement(renderContent() as React.ReactElement<any>, { filterLocked: isFilterLocked })}
-    </Layout>
+    <QueryClientProvider client={queryClient}>
+      <Layout
+        activeTab={activeTab}
+        onNavigate={setActiveTab}
+        onDisconnect={handleDisconnect}
+        dateSelection={dateSelection}
+        onDateChange={setDateSelection}
+        theme={theme}
+        onThemeToggle={toggleTheme}
+        hierarchy={hierarchy}
+        filter={filter}
+        onFilterChange={setFilter}
+        userRole={appState.userRole}
+        allowedFeatures={allowedFeatures}
+        isDateLocked={isDateLocked}
+        accountNames={accountNames}
+        onManualRefresh={enableManualRefresh ? handleManualRefresh : undefined}
+        hideAccountName={appState.userConfig?.hide_account_name}
+      >
+        {React.cloneElement(renderContent() as React.ReactElement<any>, { filterLocked: isFilterLocked })}
+      </Layout>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 };
 

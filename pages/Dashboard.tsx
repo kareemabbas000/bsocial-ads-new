@@ -9,16 +9,18 @@ import { Sparkles, Users, Globe, Monitor, Zap, Clock, Smartphone, Filter, Briefc
 import StatCard from '../components/StatCard';
 import LoadingSpinner from '../components/LoadingSpinner'; // Unified Loading
 import {
-    fetchAccountInsights,
-    fetchCampaignsWithInsights,
-    fetchBreakdown,
-    fetchDailyAccountInsights,
-    fetchHourlyInsights,
-    fetchPlacementBreakdown,
-    getPreviousPeriod,
     fetchAdSetsWithInsights,
     fetchAdsWithInsights
 } from '../services/metaService';
+import {
+    useAccountInsights,
+    usePreviousAccountInsights,
+    useDailyAccountInsights,
+    useHourlyInsights,
+    useCampaignsWithInsights,
+    useBreakdown,
+    usePlacementBreakdown
+} from '../hooks/useMetaQueries';
 import { analyzeCampaignPerformance, generatePerformanceAudit } from '../services/aiService';
 import { Campaign, InsightData, DateSelection, DailyInsight, HourlyInsight, Theme, GlobalFilter, UserConfig, AdSet, Ad } from '../types';
 
@@ -69,14 +71,6 @@ const getHeatmapColor = (val: number, max: number, metric: string) => {
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, theme, filter, userConfig, refreshInterval = 10, refreshTrigger = 0 }) => {
-    const [loading, setLoading] = useState(true);
-    const [accountData, setAccountData] = useState<InsightData | null>(null);
-    const [prevAccountData, setPrevAccountData] = useState<InsightData | null>(null);
-    const [dailyData, setDailyData] = useState<DailyInsight[]>([]);
-    const [hourlyData, setHourlyData] = useState<HourlyInsight[]>([]);
-    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-    const [visiblePlacements, setVisiblePlacements] = useState(5);
-
     // Apply Permissions
     const multiplier = userConfig?.spend_multiplier || 1.0;
     const hideTotalSpend = userConfig?.hide_total_spend || false;
@@ -85,6 +79,44 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     const allowedProfiles = userConfig?.allowed_profiles && userConfig.allowed_profiles.length > 0
         ? userConfig.allowed_profiles
         : ['sales', 'engagement', 'leads', 'messenger'];
+
+    const appliedFilter = useMemo(() => ({
+        ...filter,
+        selectedCampaignIds: userConfig?.global_campaign_filter?.length ? userConfig.global_campaign_filter : filter.selectedCampaignIds
+    }), [filter, userConfig]);
+
+    // --- React Query Hooks ---
+    const queryOptions = useMemo(() => ({
+        refetchInterval: (refreshInterval && refreshInterval > 0) ? (refreshInterval * 60 * 1000) : (false as const),
+        refetchOnWindowFocus: false,
+    }), [refreshInterval]);
+
+    const { data: accountData, isLoading: isLoadingAccount } = useAccountInsights(accountIds, token, datePreset, appliedFilter, queryOptions);
+    const { data: prevAccountData } = usePreviousAccountInsights(accountIds, token, datePreset, appliedFilter, queryOptions);
+    const { data: rawDailyData, isLoading: isLoadingDaily } = useDailyAccountInsights(accountIds, token, datePreset, appliedFilter, queryOptions);
+    const { data: hourlyData = [], isLoading: isLoadingHourly } = useHourlyInsights(accountIds, token, datePreset, appliedFilter, queryOptions);
+    const { data: campaignsResp, isLoading: isLoadingCampaigns } = useCampaignsWithInsights(accountIds, token, datePreset, appliedFilter, queryOptions);
+    const { data: ageGenderData = [], isLoading: isLoadingDemographics } = useBreakdown(accountIds, token, datePreset, 'age,gender', appliedFilter, queryOptions);
+    const { data: placementData = [], isLoading: isLoadingPlacement } = usePlacementBreakdown(accountIds, token, datePreset, appliedFilter, queryOptions);
+    const { data: regionData = [], isLoading: isLoadingRegion } = useBreakdown(accountIds, token, datePreset, 'region', appliedFilter, queryOptions);
+
+    const loading = isLoadingAccount || isLoadingDaily || isLoadingHourly || isLoadingCampaigns || isLoadingDemographics || isLoadingPlacement || isLoadingRegion;
+
+    // Computed Data
+    const campaigns = campaignsResp?.data || [];
+
+    const dailyData = useMemo(() => {
+        if (!rawDailyData) return [];
+        const adjusted = (rawDailyData as any[]).map(d => ({
+            ...d,
+            spend: d.spend * multiplier,
+            roas: (d.spend * multiplier) > 0 ? (d.roas * d.spend) / (d.spend * multiplier) : 0,
+            cpc: (d.spend * multiplier) / (d.clicks || 1)
+        }));
+        return adjusted.sort((a: any, b: any) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime());
+    }, [rawDailyData, multiplier]);
+
+    const [visiblePlacements, setVisiblePlacements] = useState(5);
 
     // Initialize Profile State based on permissions
     const [profile, setProfile] = useState<DashboardProfile>(() => {
@@ -102,10 +134,6 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     }, [allowedProfiles, profile]);
 
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-
-    const [ageGenderData, setAgeGenderData] = useState<any[]>([]);
-    const [placementData, setPlacementData] = useState<any[]>([]);
-    const [regionData, setRegionData] = useState<any[]>([]);
 
     // AI State
     const [analyzing, setAnalyzing] = useState(false);
@@ -241,77 +269,6 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
         if (prevValue === 0) return 0;
         return parseFloat((((currentValue - prevValue) / prevValue) * 100).toFixed(1));
     };
-
-    const loadData = async (isBackgroundRefresh = false) => {
-        // Soft Loading: Only show full spinner on initial load. 
-        // If we already have data, keep it visible during update (Stale-While-Revalidate).
-        if (!accountData && !isBackgroundRefresh) setLoading(true);
-
-        try {
-            const appliedFilter = {
-                ...filter,
-                selectedCampaignIds: userConfig?.global_campaign_filter?.length ? userConfig.global_campaign_filter : filter.selectedCampaignIds
-            };
-
-            const prevRange = getPreviousPeriod(datePreset);
-
-            const promises: Promise<any>[] = [
-                fetchAccountInsights(accountIds, token, datePreset, appliedFilter),
-                fetchDailyAccountInsights(accountIds, token, datePreset, appliedFilter),
-                fetchHourlyInsights(accountIds, token, datePreset, appliedFilter),
-                fetchCampaignsWithInsights(accountIds, token, datePreset, appliedFilter),
-                fetchBreakdown(accountIds, token, datePreset, 'age,gender', appliedFilter),
-                fetchPlacementBreakdown(accountIds, token, datePreset, appliedFilter),
-                fetchBreakdown(accountIds, token, datePreset, 'region', appliedFilter),
-            ];
-
-            if (prevRange) {
-                promises.push(fetchAccountInsights(accountIds, token, prevRange, appliedFilter));
-            } else {
-                promises.push(Promise.resolve(null));
-            }
-
-            const [accInsights, dayData, hourData, campData, demoData, placeData, regData, prevAccInsights] = await Promise.all(promises);
-
-            setAccountData(accInsights);
-            setPrevAccountData(prevAccInsights);
-
-            // Apply multiplier to daily data for charts
-            const adjustedDaily = (dayData as any[]).map(d => ({
-                ...d,
-                spend: d.spend * multiplier,
-                roas: (d.spend * multiplier) > 0 ? (d.roas * d.spend) / (d.spend * multiplier) : 0,
-                cpc: (d.spend * multiplier) / (d.clicks || 1)
-            }));
-
-            setDailyData([...adjustedDaily].sort((a: any, b: any) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime()));
-            setHourlyData(hourData);
-            setCampaigns(campData?.data || []);
-            setAgeGenderData(demoData);
-            setPlacementData(placeData);
-            setRegionData(regData);
-
-        } catch (e) {
-            console.error("Dashboard Load Error", e);
-        } finally {
-            if (!isBackgroundRefresh) setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadData();
-    }, [token, accountIds, datePreset, filter, refreshTrigger]);
-
-    // Auto-Refresh Logic
-    useEffect(() => {
-        if (!refreshInterval || refreshInterval <= 0) return;
-        const intervalId = setInterval(() => {
-            console.log(`Auto-refreshing dashboard data (every ${refreshInterval}m)`);
-            loadData(true);
-        }, refreshInterval * 60 * 1000);
-
-        return () => clearInterval(intervalId);
-    }, [token, accountIds, datePreset, filter, refreshInterval]);
 
     const activeConfig = useMemo(() => {
         const base = PROFILE_CONFIG[profile];
@@ -758,7 +715,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
             </div>
 
             {/* Primary KPI Grid */}
-            <div className={`grid grid-cols-1 md:grid-cols-2 ${hideTotalSpend ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
+            <div className={`grid grid-cols-1 md:grid-cols-2 ${hideTotalSpend ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} gap-4`}>
                 {activeConfig.cards.map((card: any) => {
                     // Filtered by activeConfig, no need for manual check
 
@@ -825,14 +782,14 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                 ))}
             </div >
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 2xl:grid-cols-3 gap-6">
                 {/* Left Column: Charts */}
-                <div className={`${disableAi ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-6`}>
+                <div className={`${disableAi ? '2xl:col-span-3' : '2xl:col-span-2'} space-y-6`}>
 
                     {activeTab === 'overview' && (
                         <>
                             {/* Main Trend Chart */}
-                            <div className={`${styles.cardBg} border rounded-xl p-6 min-h-[350px]`}>
+                            <div className={`${styles.cardBg} border rounded-xl p-3 md:p-6 min-h-[400px] md:min-h-[350px]`}>
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className={`text-lg font-semibold ${styles.heading}`}>{activeConfig.mainChart.title}</h3>
                                     <div className="flex items-center space-x-2 text-xs">
@@ -840,9 +797,9 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                         <span className="flex items-center"><div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: activeConfig.mainChart.line.color }}></div> {activeConfig.mainChart.line.name}</span>
                                     </div>
                                 </div>
-                                <div className="h-80 w-full" style={{ width: '99%' }}>
+                                <div className="h-[400px] md:h-80 w-full" style={{ width: '99%' }}>
                                     {dailyData.length > 0 && (
-                                        <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                        <ResponsiveContainer width="100%" height="100%" debounce={300}>
                                             <ComposedChart data={dailyData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
                                                 <defs>
                                                     <linearGradient id="colorMainBar" x1="0" y1="0" x2="0" y2="1">
@@ -904,7 +861,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                     <h3 className={`text-lg font-semibold ${styles.heading} mb-4`}>{activeConfig.secondary1.title}</h3>
                                     <div className="h-48 w-full" style={{ width: '99%' }}>
                                         {dailyData.length > 0 && (
-                                            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                            <ResponsiveContainer width="100%" height="100%" debounce={300}>
                                                 <AreaChart data={dailyData} margin={{ left: 15, bottom: 40 }}>
                                                     <defs>
                                                         <linearGradient id="colorSec1" x1="0" y1="0" x2="0" y2="1">
@@ -934,7 +891,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                     <h3 className={`text-lg font-semibold ${styles.heading} mb-4`}>{activeConfig.secondary2.title}</h3>
                                     <div className="h-48 w-full" style={{ width: '99%' }}>
                                         {dailyData.length > 0 && (
-                                            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                            <ResponsiveContainer width="100%" height="100%" debounce={300}>
                                                 <BarChart data={dailyData} margin={{ left: 15, bottom: 40 }}>
                                                     <CartesianGrid strokeDasharray="3 3" stroke={styles.chartGrid} vertical={false} />
                                                     <XAxis dataKey="date_start" stroke={styles.chartAxis} fontSize={10} tickLine={false} axisLine={false} tickFormatter={formatDateAxis}>
@@ -1121,7 +1078,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                     Demographics ({(profile === 'sales' && !hideTotalSpend) ? 'Spend' : 'Impressions'} by Age & Gender)
                                 </h3>
                                 <div className="h-72 w-full">
-                                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                    <ResponsiveContainer width="100%" height="100%" debounce={300}>
                                         <BarChart data={processedDemographics} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke={styles.chartGrid} vertical={false} />
                                             <XAxis dataKey="age" stroke={styles.chartAxis} tick={{ fontSize: 12 }}>
@@ -1150,7 +1107,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                 </h3>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div className="min-h-[400px] h-full w-full">
-                                        <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                        <ResponsiveContainer width="100%" height="100%" debounce={300}>
                                             <BarChart data={processedRegions} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                                                 <defs>
                                                     <linearGradient id="regionBarGradient" x1="0" y1="0" x2="1" y2="0">
@@ -1227,7 +1184,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
 
                                 {/* Desktop Chart View */}
                                 <div className="hidden md:block h-80 w-full">
-                                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                    <ResponsiveContainer width="100%" height="100%" debounce={300}>
                                         <ComposedChart data={processedPlacements.slice(0, 8)} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                                             <defs>
                                                 <linearGradient id="colorPlacementBar" x1="0" y1="0" x2="0" y2="1">
@@ -1430,7 +1387,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                     <p className="text-xs text-slate-500 mb-4">Radial view of impressions distribution.</p>
                                     <div className="h-64 w-full" style={{ width: '99%' }}>
                                         {hourlyData.length > 0 && (
-                                            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                            <ResponsiveContainer width="100%" height="100%" debounce={300}>
                                                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={hourlyData}>
                                                     <PolarGrid stroke={styles.chartGrid} />
                                                     <PolarAngleAxis dataKey="hour" stroke={styles.chartAxis} tick={{ fontSize: 10 }} />
@@ -1453,7 +1410,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                     <p className="text-xs text-slate-500 mb-4">Impressions vs Reach (Estimated) by Hour.</p>
                                     <div className="h-64 w-full" style={{ width: '99%' }}>
                                         {hourlyData.length > 0 && (
-                                            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                            <ResponsiveContainer width="100%" height="100%" debounce={300}>
                                                 <AreaChart data={hourlyData} margin={{ left: 15, bottom: 40 }}>
                                                     <defs>
                                                         <linearGradient id="colorImps" x1="0" y1="0" x2="0" y2="1">
@@ -1534,7 +1491,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
 
                 {/* Right Column: AI Analysis Panel - Redesigned Single Action */}
                 {!disableAi && (
-                    <div className="lg:col-span-1" ref={aiAuditRef}>
+                    <div className="2xl:col-span-1" ref={aiAuditRef}>
                         <div className={`sticky top-24 rounded-2xl h-[calc(100vh-8rem)] flex flex-col overflow-hidden transition-all duration-500 group relative ${isDark
                             ? 'bg-[#0B0E16]/80 backdrop-blur-3xl border border-blue-500/20 shadow-[0_0_50px_-10px_rgba(37,99,235,0.15)]'
                             : 'bg-white/80 backdrop-blur-3xl border border-white/60 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]' // Enhanced Light Mode Shadow
@@ -1582,7 +1539,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
                                         {/* Modern AI Orb Animation */}
                                         <div className="relative group cursor-pointer" onClick={handleRunAI} style={{ willChange: 'transform' }}>
                                             {/* Reduced Blur Radius to prevent scrollbar overflow */}
-                                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 lg:w-40 lg:h-40 xl:w-48 xl:h-48 rounded-full blur-[40px] transition-transform duration-700 group-hover:blur-[60px] group-hover:scale-105 ${isDark ? 'bg-blue-600/20' : 'bg-blue-400/20'}`}></div>
+                                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 lg:w-28 lg:h-28 xl:w-36 xl:h-36 rounded-full blur-[25px] transition-transform duration-700 group-hover:blur-[40px] group-hover:scale-105 ${isDark ? 'bg-blue-600/20' : 'bg-blue-400/20'}`}></div>
 
                                             <div className={`relative w-24 h-24 lg:w-28 lg:h-28 xl:w-32 xl:h-32 rounded-full border-2 flex items-center justify-center transition-transform duration-500 transform-gpu group-hover:scale-[1.02] ${isDark ? 'border-blue-500/30 bg-slate-900/50' : 'border-blue-200 bg-white/50 backdrop-blur-sm'}`}>
                                                 <Zap size={32} className={`text-blue-500 transition-transform duration-500 group-hover:scale-110 group-hover:drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] lg:w-10 lg:h-10 xl:w-12 xl:h-12`} />

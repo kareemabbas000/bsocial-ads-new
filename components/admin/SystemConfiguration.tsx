@@ -10,6 +10,8 @@ interface SystemConfigurationProps {
     toggleGoogleAuth: () => void;
     enableRouter: boolean;
     toggleRouter: () => void;
+    enableManualRefresh: boolean;
+    toggleManualRefresh: () => void;
     onSaveToken: () => void;
 }
 
@@ -21,6 +23,8 @@ const SystemConfiguration: React.FC<SystemConfigurationProps> = ({
     toggleGoogleAuth,
     enableRouter,
     toggleRouter,
+    enableManualRefresh,
+    toggleManualRefresh,
     onSaveToken
 }) => {
     const isDark = theme === 'dark';
@@ -69,6 +73,17 @@ const SystemConfiguration: React.FC<SystemConfigurationProps> = ({
                                 onClick={toggleRouter}
                             >
                                 <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${enableRouter ? 'translate-x-6' : 'translate-x-0'}`} />
+                            </div>
+                        </div>
+
+                        {/* Manual Refresh Toggle */}
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Manual Refresh</span>
+                            <div
+                                className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${enableManualRefresh ? 'bg-brand-500' : 'bg-slate-600'}`}
+                                onClick={toggleManualRefresh}
+                            >
+                                <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${enableManualRefresh ? 'translate-x-6' : 'translate-x-0'}`} />
                             </div>
                         </div>
                     </div>
