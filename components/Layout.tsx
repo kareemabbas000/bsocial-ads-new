@@ -153,7 +153,7 @@ const Layout: React.FC<LayoutProps> = ({
                 <img
                   src="https://icgkbruoltgvchbqednf.supabase.co/storage/v1/object/public/logos/Logo%20Bsocial%20Icon%20new.png"
                   alt="BSocial Logo"
-                  className={`relative z-10 object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.3)] saturate-200 contrast-110 group-hover:scale-105 group-hover:drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] ${isSidebarCollapsed ? 'w-8 h-auto' : 'w-10 h-auto'}`}
+                  className={`relative z-10 object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.3)] saturate-200 contrast-110 group-hover:scale-105 group-hover:drop-shadow-[0_0_30px_rgba(59,130,246,0.6)] ${isSidebarCollapsed ? 'w-8 h-auto' : 'w-9 h-auto'}`}
                 />
               </div>
 
@@ -172,7 +172,7 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
 
           {/* --- SEARCH / COMMAND --- */}
-          <div className={`px-4 mb-8 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
+          <div className={`px-4 mb-4 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
             <button
               onClick={() => setIsCommandOpen(true)}
               className={`relative overflow-hidden group border rounded-xl flex items-center
@@ -213,6 +213,7 @@ const Layout: React.FC<LayoutProps> = ({
               const sharedClasses = `relative flex items-center group
             ${isActive ? activeClasses : inactiveClasses}
             ${isSidebarCollapsed ? 'justify-center w-10 h-10 p-0 rounded-xl' : 'w-full px-4 py-2.5 rounded-none lg:rounded-r-xl'}
+            transition-all duration-300 ease-out
           `;
 
               const content = (
@@ -223,7 +224,7 @@ const Layout: React.FC<LayoutProps> = ({
                   )}
 
                   {/* Icon Container */}
-                  <div className={`relative flex items-center justify-center ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                  <div className={`relative flex items-center justify-center transition-transform duration-300 ease-out ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
                     {isActive && (
                       <div className="absolute inset-0 bg-brand-500/40 blur-[8px] rounded-full"></div>
                     )}
