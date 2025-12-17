@@ -121,7 +121,7 @@ const Layout: React.FC<LayoutProps> = ({
       {/* Sidebar - Mobile (Slide Over) & Desktop (Fixed/Collapsible) */}
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-[100] flex flex-col border-r transform will-change-[width] ${theme === 'dark'
-          ? 'bg-[#020617] border-white/5 shadow-[10px_0_50px_0_rgba(0,0,0,0.7)]'
+          ? 'bg-[#040B1C] border-white/5 shadow-[10px_0_50px_0_rgba(0,0,0,0.7)]'
           : 'bg-white/80 border-slate-200/60 backdrop-blur-2xl shadow-[5px_0_30px_0_rgba(0,0,0,0.03)]'
           } 
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} 
@@ -131,16 +131,10 @@ const Layout: React.FC<LayoutProps> = ({
         {/* --- ELITE BACKGROUND LAYERS --- */}
         {/* Wrapped in overflow-hidden to prevent the large Radial Glow from bleeding out of the sidebar */}
         <div className="absolute inset-0 overflow-hidden rounded-none z-0 pointer-events-none">
-          {/* 1. Deep Noise Texture (Dark Only) */}
+          {/* Subtle Radial Glow for "Premium" feel without noise */}
           {theme === 'dark' && (
-            <div className="absolute inset-0 opacity-[0.03] contrast-150 brightness-50 pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
+            <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full blur-[120px] bg-brand-600/10 pointer-events-none z-0"></div>
           )}
-
-          {/* 2. Radial Glow (Top Left) - "Ambient Light" */}
-          <div className={`absolute -top-20 -left-20 w-96 h-96 rounded-full blur-[100px] pointer-events-none z-0 ${theme === 'dark' ? 'bg-brand-900/10 opacity-40' : 'bg-brand-50/60 opacity-50'}`}></div>
-
-          {/* 3. Bottom Gradient - "Grounding" */}
-          <div className={`absolute bottom-0 inset-x-0 h-64 bg-gradient-to-t pointer-events-none z-0 ${theme === 'dark' ? 'from-black/80 to-transparent' : 'from-slate-100/50 to-transparent'}`}></div>
         </div>
 
         <div className="relative z-10 flex flex-col h-full">
@@ -165,7 +159,7 @@ const Layout: React.FC<LayoutProps> = ({
 
               {!isSidebarCollapsed && (
                 <div className="flex flex-col">
-                  <h1 className={`text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r ${theme === 'dark' ? 'from-white via-slate-200 to-slate-400' : 'from-slate-900 via-slate-700 to-slate-500'}`}>
+                  <h1 className={`text-xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     BSOCIAL
                   </h1>
                   <div className="flex items-center space-x-2">
@@ -183,7 +177,7 @@ const Layout: React.FC<LayoutProps> = ({
               onClick={() => setIsCommandOpen(true)}
               className={`relative overflow-hidden group border rounded-xl flex items-center
             ${theme === 'dark'
-                  ? 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/10 text-slate-400'
+                  ? 'bg-[#0B1226] border-white/5 hover:border-white/10 text-slate-400'
                   : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100 text-slate-500'
                 }
             ${isSidebarCollapsed ? 'w-10 h-10 justify-center p-0' : 'w-full justify-between py-2.5 px-3'}
@@ -203,29 +197,29 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
 
           {/* --- MENU ITEMS --- */}
-          <nav className={`flex-1 px-3 space-y-2 w-full flex flex-col items-center ${isSidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]'}`}>
+          <nav className={`flex-1 px-3 space-y-1 w-full flex flex-col items-center ${isSidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]'}`}>
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
 
               const activeClasses = theme === 'dark'
-                ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]'
+                ? 'bg-gradient-to-r from-blue-900/40 via-blue-900/10 to-transparent text-white'
                 : 'bg-gradient-to-r from-brand-50 to-transparent text-brand-700';
 
               const inactiveClasses = theme === 'dark'
                 ? 'text-slate-400 hover:text-white hover:bg-white/5'
                 : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80';
 
-              const sharedClasses = `relative flex items-center group rounded-xl
+              const sharedClasses = `relative flex items-center group
             ${isActive ? activeClasses : inactiveClasses}
-            ${isSidebarCollapsed ? 'justify-center w-10 h-10 p-0' : 'w-full px-4 py-3'}
+            ${isSidebarCollapsed ? 'justify-center w-10 h-10 p-0 rounded-xl' : 'w-full px-4 py-2.5 rounded-none lg:rounded-r-xl'}
           `;
 
               const content = (
                 <>
-                  {/* Active Indicator Line (Left) */}
+                  {/* Active Indicator Line (Left) - Restored for 'Pill' look without container border */}
                   {isActive && !isSidebarCollapsed && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-brand-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"></div>
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-lg bg-[#3b82f6]"></div>
                   )}
 
                   {/* Icon Container */}
@@ -270,7 +264,7 @@ const Layout: React.FC<LayoutProps> = ({
 
           {/* --- FOOTER / CONTROL PAD --- */}
           <div className={`p-4 mt-auto mb-2 w-full ${isSidebarCollapsed ? 'items-center' : ''}`}>
-            <div className={`rounded-2xl p-2 flex flex-col gap-1 ${isSidebarCollapsed ? 'bg-transparent' : (theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-slate-100/50 border border-slate-200')}`}>
+            <div className={`rounded-2xl p-2 flex flex-col gap-1 ${isSidebarCollapsed ? 'bg-transparent' : (theme === 'dark' ? 'bg-[#0B1226] border border-white/5' : 'bg-slate-100/50 border border-slate-200')}`}>
 
               {/* Manual Refresh */}
               {onManualRefresh && (
