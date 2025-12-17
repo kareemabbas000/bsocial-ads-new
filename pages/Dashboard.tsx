@@ -443,8 +443,8 @@ const Dashboard: React.FC<DashboardProps> = ({ token, accountIds, datePreset, th
     }, [placementData, profile, multiplier]);
 
     const handleRunAI = async () => {
-        // Mobile UX: Auto-scroll to AI Audit section if layout is stacked
-        if (window.innerWidth < 1024 && aiAuditRef.current) {
+        // UX: Auto-scroll to AI Audit section so user sees the action
+        if (aiAuditRef.current) {
             aiAuditRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 

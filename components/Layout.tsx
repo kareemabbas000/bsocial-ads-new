@@ -122,10 +122,10 @@ const Layout: React.FC<LayoutProps> = ({
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-[100] flex flex-col border-r transform will-change-[width] ${theme === 'dark'
           ? 'bg-[#040B1C] border-white/5 shadow-[10px_0_50px_0_rgba(0,0,0,0.7)]'
-          : 'bg-white/80 border-slate-200/60 backdrop-blur-2xl shadow-[5px_0_30px_0_rgba(0,0,0,0.03)]'
+          : 'bg-white lg:bg-white/80 border-slate-200/60 backdrop-blur-2xl shadow-[5px_0_30px_0_rgba(0,0,0,0.03)]'
           } 
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} 
-        ${isSidebarCollapsed ? 'w-24' : 'w-72'}
+        ${isSidebarCollapsed ? 'w-24' : 'w-64'}
         `}
       >
         {/* --- ELITE BACKGROUND LAYERS --- */}
@@ -139,13 +139,13 @@ const Layout: React.FC<LayoutProps> = ({
 
         <div className="relative z-10 flex flex-col h-full">
           {/* --- LOGO AREA --- */}
-          <div className={`relative z-10 flex flex-col items-center justify-center ${isSidebarCollapsed ? 'py-6' : 'py-8'}`}>
-            <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'space-x-4'}`}>
+          <div className={`relative z-10 flex flex-col items-center justify-center ${isSidebarCollapsed ? 'py-6' : 'py-5'}`}>
+            <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'space-x-3'}`}>
 
               {/* Logo Container with "Reactor Core" Glow - Elite Spread */}
               <div className="relative group cursor-pointer flex items-center justify-center">
                 {/* 1. Main Soft Spread Glow (Persistent) */}
-                <div className={`absolute inset-0 rounded-full bg-blue-500/20 blur-2xl group-hover:bg-blue-500/30 group-hover:blur-3xl ${isSidebarCollapsed ? 'w-16 h-16 scale-125' : 'w-20 h-20 scale-125'}`}></div>
+                <div className={`absolute inset-0 rounded-full bg-blue-500/20 blur-2xl group-hover:bg-blue-500/30 group-hover:blur-3xl ${isSidebarCollapsed ? 'w-16 h-16 scale-125' : 'w-14 h-14 scale-125'}`}></div>
 
                 {/* 2. Core Glow (Intense Center) */}
                 <div className={`absolute inset-0 rounded-full bg-indigo-500/10 blur-xl group-hover:bg-indigo-500/20 ${isSidebarCollapsed ? 'scale-110' : 'scale-100'}`}></div>
@@ -399,7 +399,7 @@ const Layout: React.FC<LayoutProps> = ({
 
         {/* Live Data Strip - Redesigned: 'Holographic Laser Line' */}
         <div className={`w-full h-px relative flex items-center justify-center z-[60] mt-6 mb-2 ${theme === 'dark' ? 'bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent' : 'bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent'}`}>
-          <div className={`absolute -top-3 px-3 py-1 rounded-full border shadow-[0_0_15px_rgba(16,185,129,0.2)] flex items-center gap-2 backdrop-blur-xl ${theme === 'dark'
+          <div className={`absolute -top-3 px-3 py-1 rounded-full border shadow-[0_0_10px_rgba(16,185,129,0.1)] flex items-center gap-2 backdrop-blur-xl ${theme === 'dark'
             ? 'bg-[#0B0E16]/80 border-emerald-500/20 text-emerald-400'
             : 'bg-white/80 border-emerald-500/30 text-emerald-600'
             }`}>
